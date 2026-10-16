@@ -1,44 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-label="How it works: the script downloads llama.cpp from its official releases and the model from IFM on Hugging Face, verifies it, and runs it on your computer">
-  <defs>
-    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5F6C64"/></marker>
-  </defs>
-  <rect width="1200" height="430" rx="24" fill="#FFFFFF" stroke="#D5DCCF" stroke-width="2"/>
-  <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-    <text x="48" y="58" font-size="26" font-weight="800" fill="#1F2A24">How it works</text>
-    <text x="48" y="86" font-size="16" fill="#66736B">Nothing is forked or bundled. The script downloads the original files from their official sources.</text>
-
-    <!-- repo -->
-    <rect x="48" y="150" width="250" height="190" rx="18" fill="#F7F9F4" stroke="#1F2A24" stroke-width="2.5"/>
-    <text x="72" y="186" font-size="13" font-weight="700" letter-spacing="2" fill="#66736B">THIS REPOSITORY</text>
-    <text x="72" y="218" font-size="21" font-weight="800" fill="#1F2A24">k2local.py</text>
-    <text x="72" y="246" font-size="15" fill="#4A5750">+ SKILL.md instructions</text>
-    <text x="72" y="270" font-size="15" fill="#4A5750">+ troubleshooting</text>
-    <text x="72" y="312" font-size="15" font-weight="700" fill="#1F2A24">≈ 50 KB, Python only</text>
-
-    <!-- sources -->
-    <rect x="430" y="118" width="340" height="104" rx="16" fill="#EEF5FC" stroke="#1C7ED6" stroke-width="2"/>
-    <text x="452" y="150" font-size="13" font-weight="700" letter-spacing="2" fill="#1C7ED6">1 · INSTALL</text>
-    <text x="452" y="178" font-size="19" font-weight="800" fill="#1F2A24">llama.cpp (build b11619)</text>
-    <text x="452" y="203" font-size="14" fill="#4A5750">github.com/ggml-org/llama.cpp releases</text>
-
-    <rect x="430" y="248" width="340" height="120" rx="16" fill="#F1EDFD" stroke="#7048E8" stroke-width="2"/>
-    <text x="452" y="280" font-size="13" font-weight="700" letter-spacing="2" fill="#7048E8">2 · DOWNLOAD</text>
-    <text x="452" y="308" font-size="19" font-weight="800" fill="#1F2A24">K2 Horizon model (GGUF)</text>
-    <text x="452" y="333" font-size="14" fill="#4A5750">huggingface.co/IFM · official files</text>
-    <text x="452" y="355" font-size="14" font-weight="700" fill="#2B9348">✓ checksum verified</text>
-
-    <!-- computer -->
-    <rect x="902" y="150" width="250" height="190" rx="18" fill="#E7F5EC" stroke="#2B9348" stroke-width="2.5"/>
-    <text x="926" y="186" font-size="13" font-weight="700" letter-spacing="2" fill="#2B9348">3 · SERVE</text>
-    <text x="926" y="218" font-size="21" font-weight="800" fill="#1F2A24">Your computer</text>
-    <text x="926" y="246" font-size="15" fill="#4A5750">model runs locally</text>
-    <text x="926" y="270" font-size="15" fill="#4A5750">nothing leaves the device</text>
-    <text x="926" y="312" font-size="14" font-family="SFMono-Regular, Menlo, Consolas, monospace" fill="#1F2A24">127.0.0.1:8080/v1</text>
-
-    <!-- arrows -->
-    <path d="M298 215 C 360 215, 370 170, 426 170" fill="none" stroke="#5F6C64" stroke-width="2.5" marker-end="url(#a)"/>
-    <path d="M298 275 C 360 275, 370 308, 426 308" fill="none" stroke="#5F6C64" stroke-width="2.5" marker-end="url(#a)"/>
-    <path d="M770 170 C 830 170, 845 215, 898 215" fill="none" stroke="#5F6C64" stroke-width="2.5" marker-end="url(#a)"/>
-    <path d="M770 308 C 830 308, 845 275, 898 275" fill="none" stroke="#5F6C64" stroke-width="2.5" marker-end="url(#a)"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-label="How it works: the script installs llama.cpp from its official releases, downloads the model from IFM on Hugging Face, verifies it, and runs it on your computer">
+  <rect width="1200" height="560" fill="#FFFFFF"/>
+  <g font-family="Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <text x="48" y="52" font-size="15" fill="#141414">K2 Horizon</text>
+  <text x="48" y="112" font-size="40" fill="#141414"><tspan font-weight="800" fill="#E25727">How it works:</tspan> from official sources to your computer</text>
+  <rect x="48" y="138" width="1104" height="4" fill="#E25727"/>
+    <g font-size="15" fill="#6B6B6B"><text x="64" y="184">Step</text><text x="160" y="184">What happens</text><text x="856" y="184">Source</text></g>
+    <rect x="48" y="198" width="1104" height="1.5" fill="#525252"/>
+    <text x="64" y="244" font-size="19" font-weight="800" fill="#E25727">01</text>
+    <text x="160" y="244" font-size="19" fill="#141414"><tspan font-weight="800">This repository</tspan> · k2local.py + SKILL.md, about 50 KB of Python</text>
+    <text x="856" y="244" font-size="19" fill="#141414">Included</text>
+    <rect x="48" y="266" width="1104" height="1" fill="#E6E6E6"/>
+    <text x="64" y="302" font-size="19" font-weight="800" fill="#E25727">02</text>
+    <text x="160" y="302" font-size="19" fill="#141414"><tspan font-weight="800">Install</tspan> · llama.cpp (build b11619), the program that runs the model</text>
+    <text x="856" y="302" font-size="16" fill="#141414" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">github.com/ggml-org/llama.cpp</text>
+    <rect x="48" y="324" width="1104" height="1" fill="#E6E6E6"/>
+    <text x="64" y="360" font-size="19" font-weight="800" fill="#E25727">03</text>
+    <text x="160" y="360" font-size="19" fill="#141414"><tspan font-weight="800">Download</tspan> · K2 Horizon GGUF, checked against IFM's checksum ✓</text>
+    <text x="856" y="360" font-size="16" fill="#141414" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">huggingface.co/IFM</text>
+    <rect x="48" y="382" width="1104" height="1" fill="#E6E6E6"/>
+    <text x="64" y="418" font-size="19" font-weight="800" fill="#E25727">04</text>
+    <text x="160" y="418" font-size="19" fill="#141414"><tspan font-weight="800">Serve</tspan> · The model runs on your computer. Nothing leaves the device</text>
+    <text x="856" y="418" font-size="16" fill="#141414" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">127.0.0.1:8080/v1</text>
+    <rect x="48" y="440" width="1104" height="1" fill="#E6E6E6"/>
+    <rect x="48" y="466" width="1104" height="70" fill="#FBF2EB"/>
+    <text x="72" y="494" font-size="13" letter-spacing="1.5" fill="#E25727">NOTHING FORKED OR BUNDLED</text>
+    <text x="72" y="520" font-size="17" font-weight="800" fill="#141414">The script downloads the original files from their official sources and verifies them.</text>
   </g>
 </svg>

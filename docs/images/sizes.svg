@@ -1,47 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-label="Comparison of the three sizes: download size and measured speed">
-  <!-- Scales: download 44 px per GB from x=210 (0–10 GB); speed 2.444 px per token/s from x=700 (0–180). -->
-  <rect width="1200" height="470" rx="24" fill="#FFFFFF" stroke="#D5DCCF" stroke-width="2"/>
-  <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-    <text x="48" y="58" font-size="26" font-weight="800" fill="#1F2A24">Which size?</text>
-    <text x="48" y="86" font-size="16" fill="#66736B">Smaller is faster and fits more devices. Bigger is more accurate.</text>
-
-    <text x="210" y="132" font-size="15" font-weight="700" fill="#1F2A24">Download size (GB)</text>
-    <text x="700" y="132" font-size="15" font-weight="700" fill="#1F2A24">Speed (tokens per second)</text>
-
-    <!-- grid: download -->
-    <g stroke="#E3E8E0" stroke-width="1.5">
-      <line x1="210" y1="148" x2="210" y2="370"/><line x1="430" y1="148" x2="430" y2="370"/><line x1="650" y1="148" x2="650" y2="370"/>
-      <line x1="700" y1="148" x2="700" y2="370"/><line x1="822.2" y1="148" x2="822.2" y2="370"/><line x1="944.4" y1="148" x2="944.4" y2="370"/><line x1="1066.6" y1="148" x2="1066.6" y2="370"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="540" viewBox="0 0 1200 540" role="img" aria-label="Which size: download size and measured speed of 0.9B, 3.7B and 7B">
+  <rect width="1200" height="540" fill="#FFFFFF"/>
+  <g font-family="Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <text x="48" y="52" font-size="15" fill="#141414">K2 Horizon</text>
+  <text x="48" y="112" font-size="40" fill="#141414"><tspan font-weight="800" fill="#E25727">Which size:</tspan> download size and speed</text>
+  <rect x="48" y="138" width="1104" height="4" fill="#E25727"/>
+    <text x="210" y="190" font-size="15" font-weight="700" fill="#141414">Download size (GB)</text>
+    <text x="700" y="190" font-size="15" font-weight="700" fill="#141414">Speed (tokens per second)</text>
+    <g stroke="#E6E6E6" stroke-width="1.5">
+      <line x1="210" y1="204" x2="210" y2="424"/><line x1="430" y1="204" x2="430" y2="424"/><line x1="650" y1="204" x2="650" y2="424"/>
+      <line x1="700" y1="204" x2="700" y2="424"/><line x1="822.2" y1="204" x2="822.2" y2="424"/><line x1="944.4" y1="204" x2="944.4" y2="424"/><line x1="1066.6" y1="204" x2="1066.6" y2="424"/>
     </g>
-    <g font-size="13" fill="#66736B" text-anchor="middle">
-      <text x="210" y="392">0</text><text x="430" y="392">5</text><text x="650" y="392">10 GB</text>
-      <text x="700" y="392">0</text><text x="822.2" y="392">50</text><text x="944.4" y="392">100</text><text x="1066.6" y="392">150</text>
+    <g font-size="13" fill="#6B6B6B" text-anchor="middle">
+      <text x="210" y="446">0</text><text x="430" y="446">5</text><text x="650" y="446">10 GB</text>
+      <text x="700" y="446">0</text><text x="822.2" y="446">50</text><text x="944.4" y="446">100</text><text x="1066.6" y="446">150</text>
     </g>
-
-    <!-- 0.9B -->
-    <text x="48" y="186" font-size="26" font-weight="800" fill="#0CA678">0.9B</text>
-    <text x="48" y="208" font-size="14" fill="#66736B">8 GB+ memory</text>
-    <rect x="239.5" y="172" width="21.1" height="26" rx="5" fill="#0CA678"/>
-    <text x="272" y="191" font-size="14" fill="#1F2A24">0.7–1.2</text>
-    <rect x="700" y="172" width="403.3" height="26" rx="5" fill="#0CA678"/>
-    <text x="1112" y="191" font-size="14" font-weight="700" fill="#1F2A24">~165</text>
-
-    <!-- 3.7B -->
-    <text x="48" y="266" font-size="26" font-weight="800" fill="#1098AD">3.7B</text>
-    <text x="48" y="288" font-size="14" fill="#66736B">16 GB+ memory</text>
-    <rect x="349" y="252" width="98.2" height="26" rx="5" fill="#1098AD"/>
-    <text x="458" y="271" font-size="14" fill="#1F2A24">3.2–5.4</text>
-    <rect x="700" y="252" width="112.4" height="26" rx="5" fill="#1098AD"/>
-    <text x="822" y="271" font-size="14" font-weight="700" fill="#1F2A24">~46</text>
-
-    <!-- 7B -->
-    <text x="48" y="346" font-size="26" font-weight="800" fill="#7048E8">7B</text>
-    <text x="48" y="368" font-size="14" fill="#66736B">24 GB+ memory</text>
-    <rect x="456" y="332" width="175.2" height="26" rx="5" fill="#7048E8"/>
-    <text x="580" y="322" font-size="14" fill="#1F2A24" text-anchor="middle">5.6–9.6</text>
-    <rect x="700" y="332" width="97.8" height="26" rx="5" fill="#7048E8"/>
-    <text x="808" y="351" font-size="14" font-weight="700" fill="#1F2A24">~40</text>
-
-    <text x="48" y="436" font-size="14" fill="#66736B">Download bars span the smallest (Q4) to highest-quality (Q8) official file. Speeds measured on an Apple M4 Pro with 24 GB of memory.</text>
+    <text x="48" y="242" font-size="26" font-weight="800" fill="#578D78">0.9B</text>
+    <text x="48" y="264" font-size="14" fill="#6B6B6B">8 GB+ memory</text>
+    <rect x="239.5" y="228" width="21.1" height="26" fill="#578D78"/>
+    <text x="272.6" y="247" font-size="14" fill="#141414">0.7–1.2</text>
+    <rect x="700" y="228" width="403.3" height="26" fill="#578D78"/>
+    <text x="1113.3" y="247" font-size="14" font-weight="700" fill="#141414">~165</text>
+    <text x="48" y="314" font-size="26" font-weight="800" fill="#E25727">3.7B</text>
+    <text x="48" y="336" font-size="14" fill="#6B6B6B">16 GB+ memory</text>
+    <rect x="349" y="300" width="98.2" height="26" fill="#E25727"/>
+    <text x="459.2" y="319" font-size="14" fill="#141414">3.2–5.4</text>
+    <rect x="700" y="300" width="112.4" height="26" fill="#E25727"/>
+    <text x="822.4" y="319" font-size="14" font-weight="700" fill="#141414">~46</text>
+    <text x="48" y="386" font-size="26" font-weight="800" fill="#102B2F">7B</text>
+    <text x="48" y="408" font-size="14" fill="#6B6B6B">24 GB+ memory</text>
+    <rect x="456" y="372" width="175.2" height="26" fill="#102B2F"/>
+    <text x="643.2" y="391" font-size="14" fill="#141414">5.6–9.6</text>
+    <rect x="700" y="372" width="97.8" height="26" fill="#102B2F"/>
+    <text x="807.8" y="391" font-size="14" font-weight="700" fill="#141414">~40</text>
+    <rect x="48" y="470" width="1104" height="50" fill="#FBF2EB"/>
+    <text x="72" y="501" font-size="14" fill="#141414"><tspan font-weight="800" fill="#E25727">NOTE</tspan>   Bars span the smallest (Q4) to highest-quality (Q8) official file. Speeds measured on an Apple M4 Pro with 24 GB of memory.</text>
   </g>
 </svg>

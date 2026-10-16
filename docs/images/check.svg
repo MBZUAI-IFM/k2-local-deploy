@@ -1,15 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-label="Terminal output of the check command on a 24 GB Mac">
-  <rect width="1200" height="330" rx="16" fill="#11181C"/>
-  <rect width="1200" height="44" rx="16" fill="#1C252B"/>
-  <rect y="28" width="1200" height="16" fill="#1C252B"/>
-  <circle cx="28" cy="22" r="7" fill="#FF5F57"/><circle cx="52" cy="22" r="7" fill="#FEBC2E"/><circle cx="76" cy="22" r="7" fill="#28C840"/>
-  <text x="600" y="27" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#8FA1AB">Terminal</text>
-  <g font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#DCE6EC">
-    <text x="32" y="88"><tspan fill="#5BCB8A">$</tspan> python3 k2-horizon-local/scripts/k2local.py check</text>
-    <text x="32" y="130" fill="#8FA1AB">Memory: 24 GB · free disk: 331 GB · GPU: apple-metal</text>
-    <text y="166"><tspan x="56">1.</tspan><tspan x="150" text-anchor="end" fill="#38D9A9" font-weight="700">0.9B</tspan><tspan x="180">Q8_0</tspan><tspan x="340" text-anchor="end">1.15 GB</tspan><tspan x="380" fill="#5BCB8A">✓ fits comfortably</tspan><tspan x="620">~165 tokens/s</tspan></text>
-    <text y="198"><tspan x="56">2.</tspan><tspan x="150" text-anchor="end" fill="#3BC9DB" font-weight="700">3.7B</tspan><tspan x="180">Q8_0</tspan><tspan x="340" text-anchor="end">5.39 GB</tspan><tspan x="380" fill="#5BCB8A">✓ fits comfortably</tspan><tspan x="620">~46 tokens/s</tspan></text>
-    <text y="230"><tspan x="56">3.</tspan><tspan x="150" text-anchor="end" fill="#B197FC" font-weight="700">7B</tspan><tspan x="180">Q4_K_M</tspan><tspan x="340" text-anchor="end">5.59 GB</tspan><tspan x="380" fill="#5BCB8A">✓ fits comfortably</tspan><tspan x="620">~40 tokens/s</tspan></text>
-    <text x="32" y="280">Recommended: <tspan fill="#FFD43B" font-weight="700">7B</tspan></text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-label="Output of the check command on a 24 GB Mac: all three sizes fit, 7B recommended">
+  <rect width="1200" height="330" rx="12" fill="#0F2326"/>
+  <path d="M0 12A12 12 0 0 1 12 0H1188A12 12 0 0 1 1200 12V44H0Z" fill="#173236"/>
+  <circle cx="28" cy="22" r="6" fill="#2E4D51"/><circle cx="48" cy="22" r="6" fill="#2E4D51"/><circle cx="68" cy="22" r="6" fill="#2E4D51"/>
+  <text x="600" y="27" text-anchor="middle" font-family="Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#8DA5A2">K2 Horizon · Terminal</text>
+  <rect x="0" y="44" width="4" height="274" fill="#E25727"/>
+  <g font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#E3ECEA">
+    <text x="32" y="88"><tspan fill="#E25727">$</tspan> python3 k2-horizon-local/scripts/k2local.py check</text>
+    <text x="32" y="130" fill="#8DA5A2">Memory: 24 GB · free disk: 331 GB · GPU: apple-metal</text>
+    <text y="166"><tspan x="56">1.</tspan><tspan x="150" text-anchor="end" fill="#8CC7B0" font-weight="700">0.9B</tspan><tspan x="180">Q8_0</tspan><tspan x="340" text-anchor="end">1.15 GB</tspan><tspan x="380" fill="#8CC7B0">✓ fits comfortably</tspan><tspan x="620">~165 tokens/s</tspan></text>
+    <text y="198"><tspan x="56">2.</tspan><tspan x="150" text-anchor="end" fill="#F28A62" font-weight="700">3.7B</tspan><tspan x="180">Q8_0</tspan><tspan x="340" text-anchor="end">5.39 GB</tspan><tspan x="380" fill="#8CC7B0">✓ fits comfortably</tspan><tspan x="620">~46 tokens/s</tspan></text>
+    <text y="230"><tspan x="56">3.</tspan><tspan x="150" text-anchor="end" fill="#FFFFFF" font-weight="700">7B</tspan><tspan x="180">Q4_K_M</tspan><tspan x="340" text-anchor="end">5.59 GB</tspan><tspan x="380" fill="#8CC7B0">✓ fits comfortably</tspan><tspan x="620">~40 tokens/s</tspan></text>
+    <text x="32" y="280">Recommended: <tspan fill="#F28A62" font-weight="700">7B</tspan></text>
   </g>
 </svg>

@@ -1,17 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="370" viewBox="0 0 1200 370" role="img" aria-label="Terminal output: starting the 7B model and asking it a question">
-  <rect width="1200" height="370" rx="16" fill="#11181C"/>
-  <rect width="1200" height="44" rx="16" fill="#1C252B"/>
-  <rect y="28" width="1200" height="16" fill="#1C252B"/>
-  <circle cx="28" cy="22" r="7" fill="#FF5F57"/><circle cx="52" cy="22" r="7" fill="#FEBC2E"/><circle cx="76" cy="22" r="7" fill="#28C840"/>
-  <text x="600" y="27" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#8FA1AB">Terminal</text>
-  <g font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#DCE6EC">
-    <text x="32" y="88"><tspan fill="#5BCB8A">$</tspan> python3 k2local.py serve --size 7B</text>
-    <text x="32" y="120"><tspan fill="#5BCB8A">✓ 7B ready in 4s</tspan> at http://127.0.0.1:8080  <tspan fill="#8FA1AB">(OpenAI-compatible API at /v1)</tspan></text>
-    <text x="32" y="172"><tspan fill="#5BCB8A">$</tspan> python3 k2local.py ask "Split 86 equally between 3 people. How much does each get?"</text>
-    <text x="32" y="204" fill="#8FA1AB">── answer ──</text>
-    <text x="32" y="236">So each person would get <tspan fill="#FFD43B" font-weight="700">28 ⅔</tspan> (≈ 28.67) of the amount, with the “⅔”</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="370" viewBox="0 0 1200 370" role="img" aria-label="Starting the 7B model and asking it a question: it answers 28 and two-thirds at 41 tokens per second">
+  <rect width="1200" height="370" rx="12" fill="#0F2326"/>
+  <path d="M0 12A12 12 0 0 1 12 0H1188A12 12 0 0 1 1200 12V44H0Z" fill="#173236"/>
+  <circle cx="28" cy="22" r="6" fill="#2E4D51"/><circle cx="48" cy="22" r="6" fill="#2E4D51"/><circle cx="68" cy="22" r="6" fill="#2E4D51"/>
+  <text x="600" y="27" text-anchor="middle" font-family="Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="#8DA5A2">K2 Horizon · Terminal</text>
+  <rect x="0" y="44" width="4" height="314" fill="#E25727"/>
+  <g font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="18" fill="#E3ECEA">
+    <text x="32" y="88"><tspan fill="#E25727">$</tspan> python3 k2local.py serve --size 7B</text>
+    <text x="32" y="120"><tspan fill="#8CC7B0">✓ 7B ready in 4s</tspan> at http://127.0.0.1:8080  <tspan fill="#8DA5A2">(OpenAI-compatible API at /v1)</tspan></text>
+    <text x="32" y="172"><tspan fill="#E25727">$</tspan> python3 k2local.py ask "Split 86 equally between 3 people. How much does each get?"</text>
+    <text x="32" y="204" fill="#8DA5A2">── answer ──</text>
+    <text x="32" y="236">So each person would get <tspan fill="#F28A62" font-weight="700">28 ⅔</tspan> (≈ 28.67) of the amount, with the “⅔”</text>
     <text x="32" y="266">representing the shared remainder. If you need whole units, give each</text>
     <text x="32" y="296">person 28 and keep the leftover 2 to be divided later.</text>
-    <text x="32" y="336" fill="#8FA1AB">7B · 3.7s · 147 tokens · <tspan fill="#B197FC" font-weight="700">41 tokens/s</tspan></text>
+    <text x="32" y="336" fill="#8DA5A2">7B · 3.7s · 147 tokens · <tspan fill="#F28A62" font-weight="700">41 tokens/s</tspan></text>
   </g>
 </svg>
