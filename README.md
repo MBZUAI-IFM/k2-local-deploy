@@ -120,6 +120,10 @@ See [`troubleshooting.md`](k2-horizon-local/references/troubleshooting.md). It c
 
 Answers vary a little between runs. In our tests, the smallest model (0.9B) sometimes got simple reasoning wrong. Use 3.7B or 7B when accuracy matters.
 
+## Community
+
+Questions, feedback, or want to share what you built? Join the IFM Discord: [ifm.ai/discord](https://ifm.ai/discord)
+
 ## Credits
 
 - **K2 Horizon** models by the [Institute of Foundation Models (IFM), MBZUAI](https://huggingface.co/IFM), released under Apache 2.0.
