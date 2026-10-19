@@ -124,10 +124,12 @@ K2 Horizon puts its reasoning inside `<ifm|think>…</ifm|think>` tags before th
 
 ## Let an AI agent set it up for you
 
-The `k2-horizon-local` folder is a **skill**: a `SKILL.md` file with step-by-step instructions, plus the script. An agent that supports skills can do the whole setup. It checks your computer, shows you the size and format options and lets you choose, then installs, starts and tests the model.
+All you need is one file: [**`SKILL.md`**](k2-horizon-local/SKILL.md). It has the step-by-step instructions, and the agent fetches the setup script from this repository by itself. It checks your computer, shows you the size and format options and lets you choose, then installs, starts and tests the model.
 
-- **Agents that support skills:** copy the `k2-horizon-local` folder into the agent's skills folder, then ask something like *"Set up K2 Horizon on my laptop."*
-- **Other agents:** give the agent this repository and ask it to *"follow k2-horizon-local/SKILL.md."*
+- **Agents that support skills (such as Claude Code):** put `SKILL.md` in a folder named `k2-horizon-local` inside the agent's skills folder (for Claude Code, `~/.claude/skills/k2-horizon-local/SKILL.md`), then ask something like *"Set up K2 Horizon on my laptop."*
+- **Any other agent that can run commands:** give it `SKILL.md` (attach the file, or paste the link) and ask it to *"follow this to set up K2 Horizon on my computer."*
+
+If you downloaded the whole repository, the agent uses the script that's already here instead.
 
 ## Something went wrong?
 

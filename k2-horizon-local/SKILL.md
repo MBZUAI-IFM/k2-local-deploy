@@ -5,7 +5,7 @@ description: Install and run K2 Horizon (MBZUAI / IFM) locally on the user's own
 
 # Run K2 Horizon locally, in the size that fits
 
-This skill takes someone from nothing to a working, private copy of K2 Horizon on their own computer. It checks what the machine can handle, lets the **user** pick the size and format, then installs, downloads, starts and tests it. Everything goes through one helper script, `scripts/k2local.py`. It uses only Python's standard library, so it works on macOS, Linux and Windows with any AI assistant that can run commands. (The original format is the exception: it installs PyTorch and Transformers into a private environment, see step 3.)
+This skill takes someone from nothing to a working, private copy of K2 Horizon on their own computer. It checks what the machine can handle, lets the **user** pick the size and format, then installs, downloads, starts and tests it. Everything goes through one helper script, `k2local.py`, which step 0 fetches from GitHub if it isn't next to this file, so this file is all a user needs to share. The script uses only Python's standard library, so it works on macOS, Linux and Windows with any AI assistant that can run commands. (The original format is the exception: it installs PyTorch and Transformers into a private environment, see step 3.)
 
 The guidance comes from real runs on an Apple M4 Pro with 24 GB of memory: all three sizes were tested with the same 12 tasks. Where a step exists because something went wrong in testing, the reason is given so you can adapt.
 
@@ -43,14 +43,22 @@ BF16 and original load the whole full-precision model into memory, so the same 2
 ## Before you start
 
 - You need Python 3.8+ (`python3 --version`, or `py --version` on Windows) and internet for the downloads.
-- Run the script by its path, for example `python3 <skill-dir>/scripts/k2local.py check`. Files go in `~/k2-horizon-local`. To change that, use `--dir` (which wins) or the `K2_DIR` environment variable. `--dir` and `--port` work before or after the command name.
+- In the commands below, `k2local.py` stands for the script's full path from step 0. Files go in `~/k2-horizon-local`. To change that, use `--dir` (which wins) or the `K2_DIR` environment variable. `--dir` and `--port` work before or after the command name.
 - If a previous run left files there, the script reuses them (`install` and `download` say "already"). Tell the user they were reused.
 
 ## Steps
 
+### 0. Get the script
+- If this file sits in a folder that has `scripts/k2local.py` next to it (the user downloaded the whole repository), use that path.
+- Otherwise, download the two scripts from the project's GitHub repository into `~/k2-horizon-local/scripts`. This single command works on macOS, Linux and Windows (use `py` instead of `python3` on Windows) and prints the folder:
+```
+python3 -c "import os,urllib.request as u;d=os.path.join(os.path.expanduser('~'),'k2-horizon-local','scripts');os.makedirs(d,exist_ok=True);[u.urlretrieve('https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/scripts/'+f,os.path.join(d,f)) for f in ('k2local.py','original_server.py')];print(d)"
+```
+Tell the user in one line what you downloaded and from where: two small Python scripts from github.com/iayazedan/run-k2-horizon-locally. If they're already there from an earlier run, reuse them. Run the command again only to update them. Keep `original_server.py` in the same folder as `k2local.py`: the original format needs it.
+
 ### 1. Check the computer
 ```
-python3 scripts/k2local.py check
+python3 k2local.py check
 ```
 This prints the memory, free disk and GPU, then one numbered line per size: which file it would use, how well it fits, the measured speed, and whether it's already downloaded. It also gives a recommendation. Below that, it lists the three formats (a, b, c) with one sentence each, and for BF16 and original, how well each size fits. Sizes that are already downloaded start in seconds, which is worth mentioning when the user chooses. "Fits comfortably" means the file is at most ~25% of the computer's memory. That rule comes from testing: on 24 GB, a 5.6 GB file ran at ~40 tokens/s, while a 9.6 GB file swapped to disk and dropped to ~3 tokens/s with a browser open.
 
@@ -72,8 +80,8 @@ Then offer the format, in one short message with the three one-sentence explanat
 
 ### 3. Install
 ```
-python3 scripts/k2local.py install                       # for the GGUF formats (compressed or BF16)
-python3 scripts/k2local.py install --format original     # for the original format
+python3 k2local.py install                       # for the GGUF formats (compressed or BF16)
+python3 k2local.py install --format original     # for the original format
 ```
 The first downloads llama.cpp build b11619, the one tested with this skill, choosing the right build for the OS and GPU: Metal on Apple Silicon, CUDA for NVIDIA, Vulkan or CPU otherwise. On macOS it also removes the "downloaded from the internet" quarantine flag that would otherwise block the program. To override the choice, use `--backend cpu|cuda|vulkan`, for example if the CUDA build fails to start.
 
@@ -81,27 +89,27 @@ The first downloads llama.cpp build b11619, the one tested with this skill, choo
 
 ### 4. Download the chosen size and format
 ```
-python3 scripts/k2local.py download --size 3.7B                        # compressed GGUF; optional: --quant Q4_K_M | Q5_K_M | Q6_K | Q8_0
-python3 scripts/k2local.py download --size 0.9B --format gguf-bf16      # full-quality GGUF
-python3 scripts/k2local.py download --size 0.9B --format original       # IFM's original files
+python3 k2local.py download --size 3.7B                        # compressed GGUF; optional: --quant Q4_K_M | Q5_K_M | Q6_K | Q8_0
+python3 k2local.py download --size 0.9B --format gguf-bf16      # full-quality GGUF
+python3 k2local.py download --size 0.9B --format original       # IFM's original files
 ```
 This downloads the official files from IFM's Hugging Face page. For compressed GGUF it picks the best quality that fits comfortably unless you pass `--quant`. For original, it downloads the whole model folder (weights, config, tokenizer and IFM's model code; 3.7B and 7B are split into 36 weight files) and checks every weight file's SHA-256. A rerun skips files that are already verified. It uses 8 parallel connections, keeps the computer awake, and verifies the SHA-256 checksum. For the bigger sizes this is the longest step, so run it in the background if you can and report progress. If it stops, the same command resumes it. Single connections stalled and a sleeping Mac froze downloads in testing, which is why the script works this way.
 
 ### 5. Start it
 ```
-python3 scripts/k2local.py serve --size 3.7B                  # optional: --format gguf | gguf-bf16 | original
+python3 k2local.py serve --size 3.7B                  # optional: --format gguf | gguf-bf16 | original
 ```
 This starts the model in the background at `http://127.0.0.1:8080` (local only) and waits until it's ready, usually a few seconds. Without `--format`, it uses the format last used for that size.
 
-The GGUF formats run in llama-server. The original format runs in `scripts/original_server.py`, a small server using the private Python environment. It offers the same API (`/v1/chat/completions`, with streaming and tools, plus `/health`), so `ask` and everything in `references/using-from-code.md` work the same way.
+The GGUF formats run in llama-server. The original format runs in `original_server.py`, a small server using the private Python environment. It offers the same API (`/v1/chat/completions`, with streaming and tools, plus `/health`), so `ask` and everything in [using-from-code.md](https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/references/using-from-code.md) work the same way.
 
-The server runs with `--reasoning-format none` on purpose. K2 Horizon wraps its thinking in `<ifm|think>…</ifm|think>` tags, and llama.cpp b11619 doesn't recognize them: without this flag the answer ends up hidden in the "thinking" field and looks empty. `ask`, and the code in `references/using-from-code.md`, split the text correctly.
+The server runs with `--reasoning-format none` on purpose. K2 Horizon wraps its thinking in `<ifm|think>…</ifm|think>` tags, and llama.cpp b11619 doesn't recognize them: without this flag the answer ends up hidden in the "thinking" field and looks empty. `ask`, and the code in [using-from-code.md](https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/references/using-from-code.md), split the text correctly.
 
 Only one model runs at a time. To switch size or format, run `stop` and then `serve --size <size> --format <format>`.
 
 ### 6. Test it
 ```
-python3 scripts/k2local.py ask "Split 86 equally between 3 people. How much does each get?"
+python3 k2local.py ask "Split 86 equally between 3 people. How much does each get?"
 ```
 Expect 28⅔ (about 28.67) and a speed line. Answers vary a little between runs: 7B was right every time in testing, and 3.7B was right most times (once it gave "28 each, with 2 left over"). 0.9B may get it wrong. That's a known limit of the smallest model, not a setup problem, so mention it if it happens. Keep the test question unambiguous: "Split 86 between 3" sometimes gets a whole-number split.
 
@@ -111,13 +119,13 @@ Show the user the answer and the speed. If they like, ask one question of their 
 Tell the user, in plain language:
 - Which size is running, at `http://127.0.0.1:8080`, and that their data stays on their machine.
 - To chat: use the exact `Ask:` command that `serve` printed. It includes the full script path, plus `--dir` or `--port` when they aren't the defaults, so the user can copy it as is. It uses `medium` thinking by default, which is fast. Add `--effort high` for hard questions (the model's own default, slower and more careful) or `--effort low` for quick ones.
-- To use it from code or other apps: it speaks the OpenAI chat API at `/v1`. See `references/using-from-code.md`.
+- To use it from code or other apps: it speaks the OpenAI chat API at `/v1`. See [using-from-code.md](https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/references/using-from-code.md).
 - To try another size or format: `download --size … [--format …]`, then `stop`, then `serve --size … [--format …]`.
 - To stop: `stop`. It confirms the server exited and the port is free. To start again later, run `serve`; install and download only happen once.
 - To remove everything: delete the `~/k2-horizon-local` folder.
 
 ## When something goes wrong
-Read `references/troubleshooting.md`. It covers the problems actually seen: empty answers, slow output, stalled downloads, macOS blocking the program, the server quitting on load, and a busy port. `k2local.py status` shows what's downloaded, which size is running, and the port. `server.log` in the storage folder has the server's own messages.
+Read `references/troubleshooting.md` next to this file or, if it isn't there, [troubleshooting.md](https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/references/troubleshooting.md) on GitHub. It covers the problems actually seen: empty answers, slow output, stalled downloads, macOS blocking the program, the server quitting on load, and a busy port. `k2local.py status` shows what's downloaded, which size is running, and the port. `server.log` in the storage folder has the server's own messages.
 
 ## Recommended settings (from IFM's model pages)
 - `top_p 0.95`. `temperature 1.0`, except **0.9B, which uses 0.6**. `ask` sets this automatically.
