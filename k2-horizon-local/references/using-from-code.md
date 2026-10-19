@@ -1,6 +1,6 @@
 # Using a local K2 Horizon model from code
 
-The server speaks the OpenAI chat-completions API at `http://127.0.0.1:8080/v1`. No API key is needed, and it only listens on the local machine.
+The server speaks the OpenAI chat-completions API at `http://127.0.0.1:8080/v1`. No API key is needed, and it only listens on the local machine. This is the same for all three formats: the GGUF formats run in llama-server, and the original format runs in `scripts/original_server.py`, which offers the same API (normal and streaming replies, tools, and the same raw `<ifm|think>` text).
 
 ## Settings (from IFM's model page)
 - `temperature: 1.0` (use **0.6 for 0.9B**), `top_p: 0.95`
@@ -55,6 +55,22 @@ Pass OpenAI-style `tools` in the request. Because the server runs with `--reason
 </ifm|tool_calls>
 ```
 `split_output()` in `scripts/k2local.py` also returns these as `[{"name": ..., "arguments": {...}}]`. To send the tool result back, add an assistant message with `tool_calls`, then a `{"role": "tool", "tool_call_id": ..., "content": ...}` message. In testing, all three sizes called simple tools correctly. 3.7B and 7B also used the results well.
+
+## Original format straight from Transformers
+If you downloaded the original format and want the model inside your own Python code (for research or fine-tuning), load the folder with the private environment's Python (`~/k2-horizon-local/python/bin/python`):
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+path = "~/k2-horizon-local/K2-Horizon-0.9B"   # expand ~ first, e.g. with os.path.expanduser
+tok = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(path, dtype=torch.bfloat16, trust_remote_code=True).to("mps")  # or "cuda" / "cpu"
+enc = tok.apply_chat_template([{"role": "user", "content": "Hello"}], add_generation_prompt=True,
+                              return_dict=True, return_tensors="pt", reasoning_effort="low").to(model.device)
+stop = [tok.eos_token_id, tok.convert_tokens_to_ids("<|ifm|im_end|>")]   # IFM's config only lists the first
+out = model.generate(**enc, max_new_tokens=512, do_sample=True, temperature=0.6, top_p=0.95, eos_token_id=stop)
+raw = tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=False).replace("<|ifm|im_end|>", "")
+print(split_output(raw)[1])   # split_output() from above
+```
 
 ## Alternative: vLLM or SGLang on a GPU server
 IFM's official commands use `--reasoning-parser k2_horizon --tool-call-parser k2_horizon`, which do this splitting on the server. For example:

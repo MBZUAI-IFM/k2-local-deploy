@@ -2,12 +2,12 @@
 
 ![Run K2 Horizon on your own computer: 0.9B, 3.7B and 7B](docs/images/banner.svg)
 
-Run [K2 Horizon](https://huggingface.co/IFM), the open models from MBZUAI's Institute of Foundation Models, privately on your own computer, in the size that fits your machine.
+Run [K2 Horizon](https://huggingface.co/IFM), the open models from MBZUAI's Institute of Foundation Models, privately on your own computer, in the size and format that fit your machine.
 
-One script checks your computer, helps you pick between the **0.9B**, **3.7B** and **7B** models, then installs, downloads, starts and tests it. Everything runs on your machine. After the download, nothing is sent anywhere.
+One script checks your computer, helps you pick between the **0.9B**, **3.7B** and **7B** models and between three formats, then installs, downloads, starts and tests it. Everything runs on your machine. After the download, nothing is sent anywhere.
 
-- Works on **macOS, Linux and Windows**, and only needs Python 3.8+. No packages to install.
-- Uses [llama.cpp](https://github.com/ggml-org/llama.cpp) and IFM's **official GGUF files** from Hugging Face.
+- Works on **macOS, Linux and Windows**, and only needs Python 3.8+. No packages to install (except for the optional original format).
+- Uses IFM's **official files** from Hugging Face: compressed or full-quality GGUF with [llama.cpp](https://github.com/ggml-org/llama.cpp), or the original weights with PyTorch and Transformers.
 - Picks the right file for your memory, so the model doesn't slow to a crawl.
 - Resumes interrupted downloads and verifies every file against the official checksum.
 - Gives you a local, OpenAI-compatible API at `http://127.0.0.1:8080/v1`.
@@ -24,7 +24,7 @@ This repository contains only the setup script and its instructions. Nothing is 
 
 It then starts the model on your computer at `http://127.0.0.1:8080`.
 
-GGUF is the compressed, single-file format made for laptops and phones. The original weights need NVIDIA GPU servers, and the 7B model is 18 GB in its original form. The GGUF version is 5.6–9.6 GB and runs on any Mac, Windows or Linux machine.
+That's the default, compressed GGUF format: one file made for laptops and phones. The 7B model is 18 GB in full precision, while compressed GGUF is 5.6–9.6 GB and runs on any Mac, Windows or Linux machine. If you want full precision, see [Which format?](#which-format) below.
 
 ## Which size should I use?
 
@@ -45,6 +45,26 @@ Not sure? Run `check` (below). It shows which sizes fit your computer and recomm
 | 8 GB | 0.9B |
 | 16 GB | 3.7B |
 | 24 GB or more | 7B |
+
+## Which format?
+
+All three are IFM's official files. Compressed GGUF is the default and the right choice for most people.
+
+| Format | `--format` | Download (0.9B / 3.7B / 7B) | Speed* | In one sentence |
+|---|---|---|---|---|
+| **GGUF, compressed** | `gguf` (default) | 0.7–1.2 / 3.2–5.4 / 5.6–9.6 GB | ~105 tokens/s | A compressed single file run by llama.cpp: the smallest download and the fastest replies on any computer, with a small loss in quality. |
+| **GGUF, full quality (BF16)** | `gguf-bf16` | 2.2 / 10.1 / 18.0 GB | ~74 tokens/s | The full-precision weights in one GGUF file for llama.cpp: original quality with nothing extra to install, but about twice the size and ~30% slower. |
+| **Original** | `original` | 2.2 / 10.1 / 18.0 GB | ~29 tokens/s | IFM's original files exactly as published, run with PyTorch and Transformers: the reference version for research, fine-tuning and Python tools, but it needs a one-time ~1 GB install and is ~3–4× slower. |
+
+\*0.9B on an Apple M1 Pro with 16 GB of memory, so the numbers compare the formats, not the sizes above.
+
+Full-precision models need much more memory: with 16 GB, only 0.9B fits in BF16 or original. `check` shows what fits for each format. To use one, add `--format` to `download` and `serve`. The original format also needs a one-time `install --format original` and Python 3.10+:
+
+```bash
+python3 k2-horizon-local/scripts/k2local.py install --format original
+python3 k2-horizon-local/scripts/k2local.py download --size 0.9B --format original
+python3 k2-horizon-local/scripts/k2local.py serve --size 0.9B --format original
+```
 
 ## Quick start
 
@@ -74,17 +94,17 @@ When you're done, stop it with `… k2local.py stop`. Next time, just run `serve
 
 | Command | What it does |
 |---|---|
-| `check` | Shows your memory, disk and GPU, how well each size fits, and a recommendation |
-| `install` | Downloads llama.cpp for your OS and GPU (Metal, CUDA, Vulkan or CPU). Use `--backend cpu` to force the CPU build |
-| `download --size 0.9B\|3.7B\|7B` | Downloads and verifies a model. Add `--quant Q4_K_M\|Q5_K_M\|Q6_K\|Q8_0` to choose the file yourself |
-| `serve [--size …]` | Starts the model in the background at `http://127.0.0.1:8080` |
+| `check` | Shows your memory, disk and GPU, how well each size and format fits, and a recommendation |
+| `install` | Downloads llama.cpp for your OS and GPU (Metal, CUDA, Vulkan or CPU). Use `--backend cpu` to force the CPU build. With `--format original`, sets up PyTorch and Transformers in a private environment instead |
+| `download --size 0.9B\|3.7B\|7B` | Downloads and verifies a model. Add `--format gguf-bf16\|original` for another format, or `--quant Q4_K_M\|Q5_K_M\|Q6_K\|Q8_0` to choose the compressed file yourself |
+| `serve [--size …] [--format …]` | Starts the model in the background at `http://127.0.0.1:8080` |
 | `ask "…"` | Asks a question. Add `--effort low\|medium\|high` to control how much it thinks, and `--show-thinking` to see its reasoning |
 | `status` | Shows what's downloaded and what's running |
 | `stop` | Stops the model and frees the memory |
 
 Files are stored in `~/k2-horizon-local`. Change that with `--dir` or the `K2_DIR` environment variable. To remove everything, delete that folder.
 
-You can download several sizes and switch between them: `stop`, then `serve --size 7B`.
+You can download several sizes and formats and switch between them: `stop`, then `serve --size 7B` (add `--format …` for another format).
 
 ## Use it from your own code
 
@@ -104,18 +124,19 @@ K2 Horizon puts its reasoning inside `<ifm|think>…</ifm|think>` tags before th
 
 ## Let an AI agent set it up for you
 
-The `k2-horizon-local` folder is a **skill**: a `SKILL.md` file with step-by-step instructions, plus the script. An agent that supports skills can do the whole setup. It checks your computer, shows you the size options and lets you choose, then installs, starts and tests the model.
+The `k2-horizon-local` folder is a **skill**: a `SKILL.md` file with step-by-step instructions, plus the script. An agent that supports skills can do the whole setup. It checks your computer, shows you the size and format options and lets you choose, then installs, starts and tests the model.
 
 - **Agents that support skills:** copy the `k2-horizon-local` folder into the agent's skills folder, then ask something like *"Set up K2 Horizon on my laptop."*
 - **Other agents:** give the agent this repository and ask it to *"follow k2-horizon-local/SKILL.md."*
 
 ## Something went wrong?
 
-See [`troubleshooting.md`](k2-horizon-local/references/troubleshooting.md). It covers empty answers, slow output, stalled downloads, macOS blocking the program, the server quitting on start, and a busy port. `status` and the `server.log` file in your storage folder are the best places to start.
+See [`troubleshooting.md`](k2-horizon-local/references/troubleshooting.md). It covers empty answers, slow output, stalled downloads, macOS blocking the program, the server quitting on start, a busy port, and the original format's setup. `status` and the `server.log` file in your storage folder are the best places to start.
 
 ## Tested on
 
-- **macOS, Apple Silicon (M4 Pro, 24 GB):** all three sizes, end to end.
+- **macOS, Apple Silicon (M4 Pro, 24 GB):** all three sizes in compressed GGUF, end to end.
+- **macOS, Apple Silicon (M1 Pro, 16 GB):** 0.9B in all three formats, end to end, including tool calls and streaming with the original format. The 3.7B original download was also verified.
 - **Linux and Windows:** supported by the script, which picks the right llama.cpp build, but not yet tested on real hardware. If the auto-selected GPU build fails, run `install --backend cpu --force`.
 
 Answers vary a little between runs. In our tests, the smallest model (0.9B) sometimes got simple reasoning wrong. Use 3.7B or 7B when accuracy matters.

@@ -1,4 +1,4 @@
-# Troubleshooting K2 Horizon (0.9B / 3.7B / 7B) on llama.cpp
+# Troubleshooting K2 Horizon (0.9B / 3.7B / 7B) locally
 
 Every problem here happened during real testing. Start with `python3 scripts/k2local.py status`, then look at `~/k2-horizon-local/server.log`.
 
@@ -36,7 +36,15 @@ Port 8080 is taken. `serve` now checks this and says so. Run `stop` if it's an e
 - The Windows and Linux paths of this skill weren't tested on real hardware. Only macOS on Apple Silicon was. If the auto-picked build fails, retry with `install --backend cpu --force`.
 
 ## "X isn't downloaded yet" or "Y is running. Run stop first"
-Each size is downloaded separately (`download --size …`), and only one runs at a time. `status` lists what's downloaded and what's running.
+Each size and format is downloaded separately (`download --size … --format …`), and only one runs at a time. `status` lists what's downloaded and what's running. In the state, `7B` is compressed GGUF, `7B-bf16` is BF16 GGUF and `7B-original` is the original format.
+
+## Original format
+- **"needs Python 3.10 or newer".** PyTorch and Transformers dropped older versions. Install Python 3.10+ from python.org, then run `install --format original` again. The GGUF formats still work with the older Python.
+- **pip fails during `install --format original`.** Usually a network problem. Rerun it with `--force`, which rebuilds the environment from scratch. On Linux, PyTorch's default download includes CUDA and is a few GB.
+- **It runs on `cpu` although there's an NVIDIA GPU (Windows).** pip installs the CPU build of PyTorch on Windows. Install a CUDA build into the environment with the command from pytorch.org, using `~/k2-horizon-local/python/Scripts/python.exe -m pip install …`. Not tested.
+- **Very slow, or the computer freezes.** The full-precision model doesn't fit in memory. In testing, 3.7B original on a 16 GB Mac loaded in 17 seconds, then swapped 12 GB to disk and barely produced output. Use a size that `check` marks as fitting, or a GGUF format.
+- **"The remote code model … seems to expect `cache_position`" in `server.log`.** A harmless warning about IFM's model code. Answers are unaffected.
+- **Answers end with `<|ifm|im_end|>`, or run on.** IFM's `generation_config.json` only lists `<|endoftext|>` as a stop token, but the model ends each turn with `<|ifm|im_end|>`. `original_server.py` adds it as a stop token. If you call Transformers yourself, pass `eos_token_id=[1, <id of <|ifm|im_end|>>]` to `generate`.
 
 ## 0.9B gets simple reasoning wrong
 That's the model, not the setup. In testing it answered "28, 28, 30" to an equal split, and it picked an outdated document over the current one. Use 3.7B or 7B when correctness matters. 0.9B is meant for quick commands on tiny devices.

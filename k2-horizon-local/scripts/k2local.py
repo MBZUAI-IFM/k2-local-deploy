@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Run K2 Horizon 0.9B, 3.7B or 7B locally with llama.cpp. Standard library only (Python 3.8+), macOS / Linux / Windows.
+"""Run K2 Horizon 0.9B, 3.7B or 7B locally. Standard library only (Python 3.8+), macOS / Linux / Windows.
+
+Three formats: gguf (compressed, the default) and gguf-bf16 (full quality) run with llama.cpp;
+original runs IFM's safetensors files with PyTorch + Transformers in a private Python environment.
 
 Commands (run them in this order the first time):
-  python3 k2local.py check                         # what fits on this computer, for each size
-  python3 k2local.py install                       # download llama.cpp for this OS
-  python3 k2local.py download --size 3.7B [--quant Q]  # download + verify one size (repeat for others)
-  python3 k2local.py serve [--size 3.7B]           # start a model in the background, wait until ready
+  python3 k2local.py check                         # what fits on this computer, for each size and format
+  python3 k2local.py install [--format original]   # llama.cpp for this OS (or the Python environment for original)
+  python3 k2local.py download --size 3.7B [--format F] [--quant Q]  # download + verify (repeat for others)
+  python3 k2local.py serve [--size 3.7B] [--format F]  # start a model in the background, wait until ready
   python3 k2local.py ask "question"                # send a question, print the answer and speed
   python3 k2local.py status | stop
 
@@ -19,21 +22,36 @@ LLAMA_BUILD = "b11619"            # the build this skill was tested with
 MODELS = {
     # Note: IFM names the 0.9B files "1B" and the 3.7B files "4B".
     "0.9B": {"repo": "IFM/K2-Horizon-0.9B-GGUF", "prefix": "K2-Horizon-1B", "temp": 0.6,   # IFM recommends 0.6 for 0.9B
-             "gb": {"Q4_K_M": 0.67, "Q5_K_M": 0.77, "Q6_K": 0.89, "Q8_0": 1.15},
+             "original": "IFM/K2-Horizon-0.9B", "original_gb": 2.16,
+             "gb": {"Q4_K_M": 0.67, "Q5_K_M": 0.77, "Q6_K": 0.89, "Q8_0": 1.15, "BF16": 2.16},
              "speed": "~165 tokens/s (Q8, M4 Pro)", "made_for": "watches, glasses, quick commands",
              "good": "instant replies, reminders, simple tool calls, short translations",
              "weak": "slips on reasoning: picked an outdated document, split 86 three ways as 28+28+30"},
     "3.7B": {"repo": "IFM/K2-Horizon-3.7B-GGUF", "prefix": "K2-Horizon-4B", "temp": 1.0,
-             "gb": {"Q4_K_M": 3.16, "Q5_K_M": 3.64, "Q6_K": 4.16, "Q8_0": 5.39},
+             "original": "IFM/K2-Horizon-3.7B", "original_gb": 10.14,
+             "gb": {"Q4_K_M": 3.16, "Q5_K_M": 3.64, "Q6_K": 4.16, "Q8_0": 5.39, "BF16": 10.13},
              "speed": "~46 tokens/s (Q8, M4 Pro)", "made_for": "phones and everyday laptop use",
              "good": "summaries, document questions, tool calls, code fixes, correct math in our tests",
              "weak": "Arabic phrasing and transliteration were partly wrong"},
     "7B":   {"repo": "IFM/K2-Horizon-7B-GGUF", "prefix": "K2-Horizon-7B", "temp": 1.0,
-             "gb": {"Q4_K_M": 5.59, "Q5_K_M": 6.47, "Q6_K": 7.39, "Q8_0": 9.57},
+             "original": "IFM/K2-Horizon-7B", "original_gb": 18.02,
+             "gb": {"Q4_K_M": 5.59, "Q5_K_M": 6.47, "Q6_K": 7.39, "Q8_0": 9.57, "BF16": 18.01},
              "speed": "~40 tokens/s (Q4, M4 Pro)", "made_for": "laptops and developer workstations",
              "good": "passed every check in our 12 tests: coding, agents, reviews, research",
              "weak": "slowest of the three; needs ~16 GB+ memory (on smaller machines it uses a more compressed file)"},
 }
+# One sentence each, shown by check so the user can choose. Speed comparisons are from 0.9B on an M1 Pro (16 GB):
+# Q8 GGUF ~105 tokens/s, BF16 GGUF ~74, original (PyTorch on the GPU) ~29.
+FORMATS = {
+    "gguf": ("GGUF, compressed",
+             "A compressed single file run by llama.cpp: the smallest download and the fastest replies on any computer, with a small loss in quality."),
+    "gguf-bf16": ("GGUF, full quality (BF16)",
+                  "The full-precision weights in one GGUF file for llama.cpp: original quality with nothing extra to install, but about twice the size of compressed and ~30% slower."),
+    "original": ("Original (Transformers)",
+                 "IFM's original files exactly as published, run with PyTorch and Transformers: the reference version for research, fine-tuning and Python tools, but it needs a one-time ~1 GB install and is ~3-4x slower than compressed."),
+}
+# The versions IFM validated on the model pages. Installed only for the original format, in a private environment.
+ORIGINAL_PACKAGES = ["torch==2.13.0", "transformers==5.15.0", "safetensors==0.8.0"]
 PORT = 8080
 UA = {"User-Agent": "k2-horizon-local-skill"}
 
@@ -158,6 +176,41 @@ def recommend(opts):
     return ok[-1]["size"] if ok else ("0.9B" if opts[0]["fit"] != "too big" else None)
 
 
+def format_options(ram):
+    """For each format, the file size and fit of every size. Full-quality GGUF and original are the same weights,
+    so they need the same memory; the same 25% rule applies (both load the whole model into memory)."""
+    have = load_state().get("models") or {}
+    out = []
+    for fmt, (title, blurb) in FORMATS.items():
+        sizes = []
+        for size, m in MODELS.items():
+            key = model_key(size, fmt)
+            gb = m["original_gb"] if fmt == "original" else m["gb"]["BF16"] if fmt == "gguf-bf16" else m["gb"][best_quant(size, ram)]
+            sizes.append({"size": size, "gb": gb, "fit": fit(gb, ram), "downloaded": bool(have.get(key, {}).get("verified"))})
+        out.append({"format": fmt, "title": title, "about": blurb, "sizes": sizes})
+    return out
+
+
+# ---------------------------------------------------------------- formats in the state file
+def model_key(size, fmt):
+    """State key for one downloaded model: "7B" (compressed GGUF), "7B-bf16" or "7B-original"."""
+    return {"gguf": size, "gguf-bf16": f"{size}-bf16", "original": f"{size}-original"}[fmt]
+
+
+def key_size(key):
+    return key.split("-")[0]
+
+
+def key_format(key):
+    return {"bf16": "gguf-bf16", "original": "original"}.get(key.partition("-")[2], "gguf")
+
+
+def label(key):
+    """"7B", "7B BF16 GGUF" or "7B original", for messages."""
+    extra = {"gguf": "", "gguf-bf16": " BF16 GGUF", "original": " original"}[key_format(key)]
+    return key_size(key) + extra
+
+
 # ---------------------------------------------------------------- check
 def cmd_check():
     system, arch = platform.system(), platform.machine().lower()
@@ -169,8 +222,9 @@ def cmd_check():
     have = downloaded_sizes()
     for o in opts:
         o["already_downloaded"] = have.get(o["size"])
+    formats = format_options(ram)
     info = {"os": system, "arch": arch, "ram_gb": round(ram, 1) if ram else None, "free_disk_gb": round(free, 1),
-            "gpu": gpu, "options": opts, "recommended_size": rec, "dir": home()}
+            "gpu": gpu, "options": opts, "recommended_size": rec, "formats": formats, "default_format": "gguf", "dir": home()}
     say(json.dumps(info, indent=1, ensure_ascii=False))
     say()
     say(f"Memory: {ram:.0f} GB · free disk: {free:.0f} GB · GPU: {gpu}" if ram else f"Free disk: {free:.0f} GB · GPU: {gpu}")
@@ -179,6 +233,15 @@ def cmd_check():
         dl = f"  [downloaded: {o['already_downloaded']}]" if o["already_downloaded"] else ""
         say(f"  {n}. {o['size']:>5}  {o['quant']:<7} {o['file_gb']:>5.2f} GB  {mark[o['fit']]:<28} {o['speed_measured']}{dl}")
     say(f"\nRecommended: {rec}" if rec else "\n⚠ Even 0.9B is a tight fit here.")
+    say("\nFormats (the list above uses a. GGUF, compressed, the default):")
+    sym = {"comfortable": "✓", "tight": "~", "too big": "✗", "unknown": "?"}
+    for letter, f in zip("abc", formats):
+        say(f"  {letter}. {f['title']}: {f['about']}")
+        if f["format"] != "gguf":
+            say("       " + " · ".join(f"{s['size']} {s['gb']:.1f} GB {sym[s['fit']]}" + (" [downloaded]" if s["downloaded"] else "")
+                                     for s in f["sizes"]))
+    if not original_python_ok():
+        say("     (c needs Python 3.10+ and a one-time install: install --format original)")
     for o in opts:
         if o["fit"] != "too big" and free < o["file_gb"] + 1:
             say(f"⚠ Not enough free disk for {o['size']} ({o['file_gb']:.1f} GB).")
@@ -216,6 +279,8 @@ def find_server(root):
 
 
 def cmd_install():
+    if ARGS.format == "original":
+        return install_original()
     backend = ARGS.backend
     if backend == "auto":
         g = gpu_kind()
@@ -257,16 +322,72 @@ def cmd_install():
     say(f"✓ llama.cpp {LLAMA_BUILD} ({backend}) installed.")
 
 
+# ---------------------------------------------------------------- install the Python environment (original format)
+def original_python():
+    env = os.path.join(home(), "python")
+    return os.path.join(env, "Scripts", "python.exe") if platform.system() == "Windows" else os.path.join(env, "bin", "python")
+
+
+def original_python_ok():
+    py = original_python()
+    return os.path.exists(py) and subprocess.run([py, "-c", "import torch, transformers, safetensors"],
+                                                 capture_output=True).returncode == 0
+
+
+def python_310():
+    """A Python 3.10+ to build the environment from. PyTorch and Transformers no longer support older versions."""
+    if sys.version_info >= (3, 10):
+        return [sys.executable]
+    for name in ("python3.13", "python3.12", "python3.11", "python3.10"):
+        if shutil.which(name):
+            return [shutil.which(name)]
+    if platform.system() == "Windows" and shutil.which("py"):
+        for v in ("3.13", "3.12", "3.11", "3.10"):
+            if subprocess.run(["py", f"-{v}", "--version"], capture_output=True).returncode == 0:
+                return ["py", f"-{v}"]
+    raise SystemExit("The original format needs Python 3.10 or newer, for PyTorch. Install it from python.org, "
+                     "then run install --format original again. (The GGUF formats work with your current Python.)")
+
+
+def install_original():
+    py = original_python()
+    if original_python_ok() and not ARGS.force:
+        say(f"✓ Python environment for the original format already installed: {os.path.dirname(os.path.dirname(py))}")
+        return report_torch(py)
+    env = os.path.join(home(), "python")
+    say(f"Creating a private Python environment in {env} (nothing is installed system-wide) …")
+    subprocess.run(python_310() + ["-m", "venv", "--clear", env], check=True)
+    say(f"Installing {', '.join(ORIGINAL_PACKAGES)}, the versions IFM validated. This downloads 0.5-3 GB, depending on your system …")
+    for step in (["install", "--upgrade", "pip"], ["install", *ORIGINAL_PACKAGES]):
+        if subprocess.run([py, "-m", "pip", "--disable-pip-version-check", *step]).returncode != 0:
+            raise SystemExit("✗ pip couldn't install the packages (see above). Check your internet connection and run "
+                             "install --format original --force to retry.")
+    report_torch(py)
+
+
+def report_torch(py):
+    out = subprocess.run([py, "-c", "import torch, transformers; print(torch.__version__, transformers.__version__, "
+                          "'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')"],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        raise SystemExit("✗ The environment is broken:\n" + out.stderr[-1500:] + "\nRun install --format original --force.")
+    torch_v, tf_v, device = out.stdout.split()
+    save_state(original_python=py, original_device=device)
+    say(f"✓ PyTorch {torch_v} + Transformers {tf_v} ready. The original format will run on: {device}"
+        + ("  (CPU only: it works, but slowly)" if device == "cpu" else ""))
+
+
 # ---------------------------------------------------------------- download the model
 def filename_note(size):
     return {"0.9B": " (IFM names the 0.9B file \"1B\")", "3.7B": " (IFM names the 3.7B file \"4B\")"}.get(size, "")
 
 
 def downloaded_sizes():
+    """Compressed GGUF downloads only, size -> quant (check's main list is about those)."""
     out = {}
-    for size, m in (load_state().get("models") or {}).items():
-        if m.get("verified") and os.path.exists(m.get("path", "")):
-            out[size] = m.get("quant")
+    for key, m in (load_state().get("models") or {}).items():
+        if key_format(key) == "gguf" and m.get("verified") and os.path.exists(m.get("path", "")):
+            out[key] = m.get("quant")
     return out
 
 
@@ -280,33 +401,20 @@ def run_hint():
     return f'{py} "{script}"{extra}{port}'
 
 
-def record_model(size, **kw):
+def record_model(key, **kw):
     st = load_state()
     models = st.get("models") or {}
-    models[size] = {**models.get(size, {}), **kw}
-    save_state(models=models, active=size)
+    models[key] = {**models.get(key, {}), **kw}
+    save_state(models=models, active=key)
 
 
-def cmd_download():
-    size = ARGS.size
-    if not size:
-        raise SystemExit("Choose a size: download --size 0.9B | 3.7B | 7B   (run check to see what fits)")
-    m = MODELS[size]
-    quant = ARGS.quant or best_quant(size, total_ram_gb())
-    name = f"{m['prefix']}-{quant}.gguf"
-    dest = os.path.join(home(), name)
-    prev = (load_state().get("models") or {}).get(size, {})
-    if prev.get("verified") == name and os.path.exists(dest) and os.path.getsize(dest) == prev.get("verified_size"):
-        say(f"✓ {size} already downloaded and verified (sha256 checked when it was downloaded): {dest}" + filename_note(size))
-        record_model(size, path=dest, quant=quant); return
-    meta = next(f for f in fetch_json(f"https://huggingface.co/api/models/{m['repo']}/tree/main") if f["path"] == name)
-    total, sha = meta["lfs"]["size"], meta["lfs"]["oid"]
-    url = f"https://huggingface.co/{m['repo']}/resolve/main/{name}"
+def fetch_file(url, dest, total, sha=None):
+    """Download one file with 8 parallel ranges, resuming whatever is already there, then check its sha256."""
     keep_awake()
     have = os.path.getsize(dest) if os.path.exists(dest) else 0
     if have > total:
         os.remove(dest); have = 0
-    say(f"Downloading {name}: {total / 1e9:.2f} GB ({have / 1e9:.2f} GB already here)")
+    say(f"Downloading {os.path.basename(dest)}: {total / 1e9:.2f} GB ({have / 1e9:.2f} GB already here)")
 
     parts = 8                      # parallel ranges: a single connection kept stalling in our tests
     remaining = total - have
@@ -335,12 +443,15 @@ def cmd_download():
     threads = [threading.Thread(target=worker, args=(i, s, e), daemon=True) for i, (s, e) in enumerate(bounds)]
     for t in threads:
         t.start()
-    last, t0 = sum(got), time.time()
+    last, t_last = sum(got), time.time()
     while any(t.is_alive() for t in threads):
-        time.sleep(15)
-        now = sum(got)
-        say(f"  {(have + now) / 1e9:5.2f} / {total / 1e9:.2f} GB · {(now - last) / 15 / 1e6:5.1f} MB/s")
-        last = now
+        for _ in range(15):        # report every 15 s, but notice a finished small file right away
+            time.sleep(1)
+            if not any(t.is_alive() for t in threads):
+                break
+        now, t_now = sum(got), time.time()
+        say(f"  {(have + now) / 1e9:5.2f} / {total / 1e9:.2f} GB · {(now - last) / (t_now - t_last) / 1e6:5.1f} MB/s")
+        last, t_last = now, t_now
     if errors:
         raise SystemExit("Some parts failed after many retries. Run the same command again: it resumes.")
     with open(dest, "ab") as out:
@@ -349,16 +460,84 @@ def cmd_download():
             with open(part, "rb") as p:
                 shutil.copyfileobj(p, out, 1 << 24)
             os.remove(part)
-    say("Verifying checksum against Hugging Face …")
-    h = hashlib.sha256()
-    with open(dest, "rb") as f:
-        for b in iter(lambda: f.read(1 << 24), b""):
-            h.update(b)
-    if os.path.getsize(dest) != total or h.hexdigest() != sha:
-        os.rename(dest, dest + ".bad")
-        raise SystemExit("✗ Checksum mismatch. The damaged file was renamed to .bad. Run download again.")
-    record_model(size, path=dest, quant=quant, verified=name, verified_size=total)
-    say(f"✓ Verified {name} (sha256 matches Hugging Face).{filename_note(size)} Start it with: serve --size {size}")
+    if sha:
+        say("Verifying checksum against Hugging Face …")
+        h = hashlib.sha256()
+        with open(dest, "rb") as f:
+            for b in iter(lambda: f.read(1 << 24), b""):
+                h.update(b)
+        if os.path.getsize(dest) != total or h.hexdigest() != sha:
+            os.rename(dest, dest + ".bad")
+            raise SystemExit(f"✗ Checksum mismatch in {os.path.basename(dest)}. The damaged file was renamed to .bad. Run download again.")
+    elif os.path.getsize(dest) != total:
+        os.remove(dest)
+        raise SystemExit(f"✗ {os.path.basename(dest)} came out the wrong size. Run download again.")
+
+
+def cmd_download():
+    size = ARGS.size
+    if not size:
+        raise SystemExit("Choose a size: download --size 0.9B | 3.7B | 7B   (run check to see what fits)")
+    fmt = "gguf-bf16" if ARGS.quant == "BF16" else ARGS.format
+    if fmt == "original":
+        return download_original(size)
+    if fmt == "gguf-bf16" and ARGS.quant not in (None, "BF16"):
+        raise SystemExit("--format gguf-bf16 is the BF16 file; leave out --quant (or use --format gguf with it).")
+    m = MODELS[size]
+    key = model_key(size, fmt)
+    quant = "BF16" if fmt == "gguf-bf16" else ARGS.quant or best_quant(size, total_ram_gb())
+    name = f"{m['prefix']}-{quant}.gguf"
+    dest = os.path.join(home(), name)
+    prev = (load_state().get("models") or {}).get(key, {})
+    if prev.get("verified") == name and os.path.exists(dest) and os.path.getsize(dest) == prev.get("verified_size"):
+        say(f"✓ {label(key)} already downloaded and verified (sha256 checked when it was downloaded): {dest}" + filename_note(size))
+        record_model(key, path=dest, quant=quant); return
+    meta = next(f for f in fetch_json(f"https://huggingface.co/api/models/{m['repo']}/tree/main") if f["path"] == name)
+    total, sha = meta["lfs"]["size"], meta["lfs"]["oid"]
+    fetch_file(f"https://huggingface.co/{m['repo']}/resolve/main/{name}", dest, total, sha)
+    record_model(key, path=dest, quant=quant, verified=name, verified_size=total)
+    fmt_flag = "" if fmt == "gguf" else f" --format {fmt}"
+    say(f"✓ Verified {name} (sha256 matches Hugging Face).{filename_note(size)} Start it with: serve --size {size}{fmt_flag}")
+
+
+def download_original(size):
+    """Every file of IFM's original repo (weights, config, tokenizer, IFM's model code) into one folder.
+    Weight files are checked against their sha256; the small text files against their size."""
+    if ARGS.quant:
+        raise SystemExit("--quant is for the GGUF formats. The original format has one version per size.")
+    repo = MODELS[size]["original"]
+    key = model_key(size, "original")
+    folder = os.path.join(home(), repo.split("/")[1])
+    os.makedirs(folder, exist_ok=True)
+    files = [f for f in fetch_json(f"https://huggingface.co/api/models/{repo}/tree/main")
+             if f["type"] == "file" and not f["path"].endswith((".md", ".png", ".jpg"))]   # skip the model card and images
+    total = sum(f["size"] for f in files)
+    marker = os.path.join(folder, ".verified.json")   # files already checked, so a resumed download doesn't rehash them
+    try:
+        done = json.load(open(marker))
+    except Exception:
+        done = {}
+    if all(done.get(f["path"]) == f["size"] and os.path.exists(os.path.join(folder, f["path"])) for f in files):
+        say(f"✓ {label(key)} already downloaded and verified: {folder}")
+        record_model(key, path=folder, verified=True, verified_size=total); return
+    say(f"Downloading {repo} (original format): {len(files)} files, {total / 1e9:.2f} GB in total")
+    for f in files:
+        dest = os.path.join(folder, f["path"])
+        if done.get(f["path"]) == f["size"] and os.path.exists(dest):
+            continue
+        url = f"https://huggingface.co/{repo}/resolve/main/{f['path']}"
+        if "lfs" in f:
+            fetch_file(url, dest, f["size"], f["lfs"]["oid"])
+        else:
+            urllib.request.urlretrieve(url, dest)
+            if os.path.getsize(dest) != f["size"]:
+                raise SystemExit(f"✗ {f['path']} came out the wrong size. Run download again.")
+        done[f["path"]] = f["size"]
+        json.dump(done, open(marker, "w"), indent=1)
+    record_model(key, path=folder, verified=True, verified_size=total)
+    say(f"✓ Verified all {len(files)} files (weights by sha256). Start it with: serve --size {size} --format original")
+    if not original_python_ok():
+        say("  First run the one-time Python setup: install --format original")
 
 
 # ---------------------------------------------------------------- serve / stop / status
@@ -389,42 +568,71 @@ def healthy():
         return False
 
 
+def pick_key(st):
+    """Which downloaded model to serve. --format wins; otherwise the last one used for that size,
+    then compressed GGUF, then BF16 GGUF, then original."""
+    models = st.get("models") or {}
+    active = st.get("active")
+    size = ARGS.size or (key_size(active) if active else None)
+    if not size:
+        return None
+    if ARGS.format:
+        return model_key(size, ARGS.format)
+    if active and key_size(active) == size and active in models:
+        return active
+    return next((k for k in (size, f"{size}-bf16", f"{size}-original") if k in models), size)
+
+
 def cmd_serve():
     st = load_state()
-    server = st.get("server")
     models = st.get("models") or {}
-    size = ARGS.size or st.get("active")
-    if not server or not os.path.exists(server):
-        raise SystemExit("llama.cpp isn't installed yet. Run: install")
-    if not size or size not in models or not os.path.exists(models[size].get("path", "")):
-        have = ", ".join(models) or "none"
-        raise SystemExit(f"{size or 'That size'} isn't downloaded yet (downloaded: {have}). Run: download --size {size or '3.7B'}")
-    model = models[size]["path"]
+    key = pick_key(st)
+    if not key or key not in models or not os.path.exists(models[key].get("path", "")):
+        have = ", ".join(label(k) for k in models) or "none"
+        size = key_size(key) if key else "3.7B"
+        fmt_flag = f" --format {key_format(key)}" if key and key_format(key) != "gguf" else ""
+        raise SystemExit(f"{label(key) if key else 'That size'} isn't downloaded yet (downloaded: {have}). "
+                         f"Run: download --size {size}{fmt_flag}")
+    fmt = key_format(key)
+    if fmt == "original":
+        py = original_python()
+        if not original_python_ok():
+            raise SystemExit("The Python environment for the original format isn't installed yet. Run: install --format original")
+    else:
+        server = st.get("server")
+        if not server or not os.path.exists(server):
+            raise SystemExit("llama.cpp isn't installed yet. Run: install")
+    model = models[key]["path"]
     if port_in_use():
         if pid_alive(st.get("pid")) and healthy():
-            if st.get("serving") == size:
-                say(f"✓ {size} is already running at http://127.0.0.1:{ARGS.port}"); return
-            raise SystemExit(f"{st.get('serving')} is running. Run stop first, then serve --size {size}.")
+            if st.get("serving") == key:
+                say(f"✓ {label(key)} is already running at http://127.0.0.1:{ARGS.port}"); return
+            raise SystemExit(f"{label(st.get('serving') or '?')} is running. Run stop first, then serve again.")
         raise SystemExit(f"✗ Port {ARGS.port} is used by another program. Stop it, or pick another port: --port 8081 (use it with ask too).")
     log = open(os.path.join(home(), "server.log"), "w")
-    # --reasoning-format none: llama.cpp b11619 doesn't know K2 Horizon's <ifm|think> tags and would hide the answer.
-    cmd = [server, "-m", model, "--host", "127.0.0.1", "--port", str(ARGS.port), "--jinja",
-           "--reasoning-format", "none", "-c", str(ARGS.ctx), "-ngl", "99"]
-    kw = {"stdout": log, "stderr": log, "cwd": os.path.dirname(server)}
+    if fmt == "original":
+        cmd = [py, os.path.join(os.path.dirname(os.path.abspath(__file__)), "original_server.py"),
+               "--model", model, "--port", str(ARGS.port)]
+        kw = {"stdout": log, "stderr": log, "cwd": home(), "env": {**os.environ, "PYTHONUNBUFFERED": "1"}}
+    else:
+        # --reasoning-format none: llama.cpp b11619 doesn't know K2 Horizon's <ifm|think> tags and would hide the answer.
+        cmd = [server, "-m", model, "--host", "127.0.0.1", "--port", str(ARGS.port), "--jinja",
+               "--reasoning-format", "none", "-c", str(ARGS.ctx), "-ngl", "99"]
+        kw = {"stdout": log, "stderr": log, "cwd": os.path.dirname(server)}
     if platform.system() == "Windows":
         kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     else:
         kw["start_new_session"] = True
     proc = subprocess.Popen(cmd, **kw)
-    save_state(pid=proc.pid, port=ARGS.port, serving=size, active=size)
-    say(f"Starting K2-Horizon-{size} (pid {proc.pid}) …")
+    save_state(pid=proc.pid, port=ARGS.port, serving=key, active=key)
+    say(f"Starting K2-Horizon-{label(key)} (pid {proc.pid}) …")
     t0 = time.time()
     while time.time() - t0 < 900:   # first load of a big file can be slow
         if proc.poll() is not None:
             tail = open(os.path.join(home(), "server.log")).read()[-1500:]
             raise SystemExit("✗ The server stopped while loading. Last log lines:\n" + tail)
         if healthy():
-            say(f"✓ {size} ready in {time.time() - t0:.0f}s at http://127.0.0.1:{ARGS.port}  (OpenAI-compatible API at /v1)")
+            say(f"✓ {label(key)} ready in {time.time() - t0:.0f}s at http://127.0.0.1:{ARGS.port}  (OpenAI-compatible API at /v1)")
             h = run_hint()
             say(f"  Ask:  {h} ask \"your question\"\n  Stop: {h} stop")
             return
@@ -481,8 +689,9 @@ def split_output(raw):
 def cmd_ask():
     if not healthy():
         raise SystemExit("The model isn't running. Run: serve")
-    size = load_state().get("serving")
-    temp = MODELS.get(size, {}).get("temp", 1.0)   # IFM: 0.6 for 0.9B, 1.0 for the others
+    key = load_state().get("serving")
+    size = label(key) if key else None
+    temp = MODELS.get(key_size(key) if key else "", {}).get("temp", 1.0)   # IFM: 0.6 for 0.9B, 1.0 for the others
     body = {"messages": [{"role": "user", "content": ARGS.prompt}], "temperature": temp, "top_p": 0.95,
             "max_tokens": ARGS.max_tokens, "chat_template_kwargs": {"reasoning_effort": ARGS.effort}}
     req = urllib.request.Request(f"http://127.0.0.1:{ARGS.port}/v1/chat/completions", data=json.dumps(body).encode(),
@@ -512,9 +721,13 @@ def main():
     def sp(name):
         return sub.add_parser(name, parents=[common])
     sp("check")
+    fmts = list(FORMATS)
     p = sp("install"); p.add_argument("--backend", default="auto", choices=["auto", "cpu", "cuda", "vulkan"]); p.add_argument("--force", action="store_true")
-    p = sp("download"); p.add_argument("--size", choices=list(MODELS)); p.add_argument("--quant", choices=["Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0"])
-    p = sp("serve"); p.add_argument("--size", choices=list(MODELS)); p.add_argument("--ctx", type=int, default=16384)
+    p.add_argument("--format", default="gguf", choices=fmts, help="original: set up PyTorch + Transformers instead of llama.cpp")
+    p = sp("download"); p.add_argument("--size", choices=list(MODELS)); p.add_argument("--format", default="gguf", choices=fmts)
+    p.add_argument("--quant", choices=["Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "BF16"], help="GGUF file to use (BF16 = --format gguf-bf16)")
+    p = sp("serve"); p.add_argument("--size", choices=list(MODELS)); p.add_argument("--format", choices=fmts, help="default: the last one used for that size")
+    p.add_argument("--ctx", type=int, default=16384)
     p = sp("ask"); p.add_argument("prompt"); p.add_argument("--effort", default="medium", choices=["low", "medium", "high"],
                    help="the model's own default is high; ask uses medium so quick checks are fast")
     p.add_argument("--max-tokens", type=int, default=4096); p.add_argument("--show-thinking", action="store_true")
