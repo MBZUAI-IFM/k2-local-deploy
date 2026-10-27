@@ -2,9 +2,9 @@
 
 Every problem here happened during real testing. Start with `python3 scripts/k2local.py status`, then look at `~/k2-horizon-local/server.log`.
 
-## Answers are empty, or full of `<ifm|…>` tags
-**Cause:** K2 Horizon wraps its reasoning in `<ifm|think>…</ifm|think>`. At other effort levels the tag names vary, such as `<ifm|think_fast>` and `</ifm|think_faster>`. Tool calls come as `<ifm|tool_calls><ifm|tool_call>name<ifm|arg_key>k</ifm|arg_key><ifm|arg_value>v</ifm|arg_value></ifm|tool_call></ifm|tool_calls>`. llama.cpp b11619 doesn't recognize these. With its default reasoning parser, it puts the entire reply into `reasoning_content` and `content` comes back empty.
-**Fix:** start the server with `--reasoning-format none` (`serve` already does) and split the text yourself. Use `split_output()` in `k2local.py`, or the copy in `using-from-code.md`. Everything after the first `</ifm|think…>` tag is the answer.
+## Empty answer with 3.7B at medium effort
+**Cause:** the model, not the setup. llama.cpp recognizes K2 Horizon's thinking tags and splits replies into `reasoning_content` (thinking), `content` (answer) and `tool_calls`. But at medium effort, 3.7B opens its thinking with `<ifm|think_fast>` and closes it with `</ifm|think>` instead of `</ifm|think_fast>`. llama.cpp keeps waiting for the matching tag, so the whole reply, answer and any tool call included, ends up in `reasoning_content`, and `content` is empty. Seen in every 3.7B medium run in testing (Q4_K_M). 0.9B closes its tags correctly. Reported to IFM.
+**Fix:** `ask` already handles it. In your own code, if `reasoning_content` contains a `</ifm|think…>` tag, split it yourself with `read_message()` from `using-from-code.md`. Or use `high` or `low` effort with 3.7B.
 
 ## Very slow (a few tokens per second on a Mac or GPU machine)
 **Cause:** memory pressure. The model plus other apps don't fit, so the OS swaps the model to disk. Seen with the 9.6 GB Q8 file on a 24 GB Mac with Chrome open: ~3 tokens/s instead of ~40.

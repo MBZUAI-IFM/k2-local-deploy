@@ -120,7 +120,7 @@ reply = client.chat.completions.create(
 )
 ```
 
-K2 Horizon puts its reasoning inside `<ifm|think>…</ifm|think>` tags before the answer. See [`using-from-code.md`](k2-horizon-local/references/using-from-code.md) for a small function that separates them, and for tool calling.
+The answer is in `reply.choices[0].message.content` and the model's thinking in `reasoning_content`. Tool calls come back in the standard `tool_calls` field. See [`using-from-code.md`](k2-horizon-local/references/using-from-code.md) for tool calling, and for one known case to handle: 3.7B at medium effort returns an empty answer.
 
 ## Let an AI agent set it up for you
 

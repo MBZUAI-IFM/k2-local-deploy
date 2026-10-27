@@ -103,7 +103,9 @@ This starts the model in the background at `http://127.0.0.1:8080` (local only) 
 
 The GGUF formats run in llama-server. The original format runs in `original_server.py`, a small server using the private Python environment. It offers the same API (`/v1/chat/completions`, with streaming and tools, plus `/health`), so `ask` and everything in [using-from-code.md](https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/references/using-from-code.md) work the same way.
 
-The server runs with `--reasoning-format none` on purpose. K2 Horizon wraps its thinking in `<ifm|think>…</ifm|think>` tags, and llama.cpp b11619 doesn't recognize them: without this flag the answer ends up hidden in the "thinking" field and looks empty. `ask`, and the code in [using-from-code.md](https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/references/using-from-code.md), split the text correctly.
+K2 Horizon wraps its thinking in tags that change with the effort: `<ifm|think>` (high), `<ifm|think_fast>` (medium) and `<ifm|think_faster>` (low). llama.cpp recognizes them, so replies come back split: the thinking in `reasoning_content`, the answer in `content`, and tool calls in `tool_calls`. `original_server.py` returns the same fields.
+
+One known exception: at medium effort, 3.7B opens with `<ifm|think_fast>` but closes with `</ifm|think>`, so llama.cpp never finds the end of the thinking. The whole reply lands in `reasoning_content` and `content` is empty (tool calls too). `ask` detects this and recovers the answer; [using-from-code.md](https://raw.githubusercontent.com/iayazedan/run-k2-horizon-locally/main/k2-horizon-local/references/using-from-code.md) shows the same fix for the user's own code. This was reported to IFM.
 
 Only one model runs at a time. To switch size or format, run `stop` and then `serve --size <size> --format <format>`.
 

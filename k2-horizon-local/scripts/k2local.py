@@ -615,9 +615,9 @@ def cmd_serve():
                "--model", model, "--port", str(ARGS.port)]
         kw = {"stdout": log, "stderr": log, "cwd": home(), "env": {**os.environ, "PYTHONUNBUFFERED": "1"}}
     else:
-        # --reasoning-format none: llama.cpp b11619 doesn't know K2 Horizon's <ifm|think> tags and would hide the answer.
+        # llama.cpp recognizes K2 Horizon's tags: replies come back as reasoning_content, content and tool_calls.
         cmd = [server, "-m", model, "--host", "127.0.0.1", "--port", str(ARGS.port), "--jinja",
-               "--reasoning-format", "none", "-c", str(ARGS.ctx), "-ngl", "99"]
+               "-c", str(ARGS.ctx), "-ngl", "99"]
         kw = {"stdout": log, "stderr": log, "cwd": os.path.dirname(server)}
     if platform.system() == "Windows":
         kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
@@ -671,8 +671,28 @@ def cmd_status():
 THINK_END = re.compile(r"</ifm\|think\w*>")
 
 
+def read_message(m):
+    """(thinking, answer, tool_calls) from a reply message. The server already splits K2 Horizon's reasoning,
+    answer and tool calls. One exception, seen with 3.7B at medium effort: it opens with <ifm|think_fast> but closes
+    with </ifm|think>, so the server never finds the end and returns everything as reasoning, with an empty answer.
+    The wrong tag stays in the text, so split it here."""
+    reasoning, content = m.get("reasoning_content") or "", m.get("content") or ""
+    if THINK_END.search(reasoning) or "<ifm|" in content:
+        return split_output(reasoning + content)
+    calls = []
+    for c in m.get("tool_calls") or []:
+        fn = c.get("function") or {}
+        try:
+            args = json.loads(fn.get("arguments") or "{}")
+        except ValueError:
+            args = fn.get("arguments")
+        calls.append({"name": fn.get("name"), "arguments": args})
+    return reasoning.strip(), content.strip(), calls
+
+
 def split_output(raw):
-    """Return (thinking, answer, tool_calls). Handles <ifm|think>, <ifm|think_fast>, … and <ifm|tool_call> blocks."""
+    """Split raw K2 Horizon text into (thinking, answer, tool_calls). Accepts any closing tag (<ifm|think>,
+    <ifm|think_fast>, …), which also covers 3.7B's mismatched medium tag, and parses <ifm|tool_call> blocks."""
     parts = THINK_END.split(raw, maxsplit=1)
     thinking, answer = (parts[0], parts[1]) if len(parts) == 2 else ("", raw)
     thinking = re.sub(r"<ifm\|think\w*>", "", thinking)
@@ -700,7 +720,7 @@ def cmd_ask():
     with urllib.request.urlopen(req, timeout=900) as r:
         res = json.loads(r.read())
     m = res["choices"][0]["message"]
-    thinking, answer, calls = split_output((m.get("reasoning_content") or "") + (m.get("content") or ""))
+    thinking, answer, calls = read_message(m)
     if ARGS.show_thinking and thinking:
         say("── thinking ──\n" + thinking + "\n")
     say("── answer ──\n" + (answer or "(empty)"))

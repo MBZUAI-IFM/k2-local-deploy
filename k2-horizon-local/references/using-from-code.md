@@ -1,6 +1,8 @@
 # Using a local K2 Horizon model from code
 
-The server speaks the OpenAI chat-completions API at `http://127.0.0.1:8080/v1`. No API key is needed, and it only listens on the local machine. This is the same for all three formats: the GGUF formats run in llama-server, and the original format runs in `scripts/original_server.py`, which offers the same API (normal and streaming replies, tools, and the same raw `<ifm|think>` text).
+The server speaks the OpenAI chat-completions API at `http://127.0.0.1:8080/v1`. No API key is needed, and it only listens on the local machine. This is the same for all three formats: the GGUF formats run in llama-server, and the original format runs in `scripts/original_server.py`, which offers the same API.
+
+Replies come back already split: the thinking in `reasoning_content`, the answer in `content`, and tool calls in `tool_calls`. The one exception is 3.7B at medium effort, which closes its thinking with the wrong tag, so the answer lands in `reasoning_content` and `content` is empty. `read_message()` below handles that case.
 
 ## Settings (from IFM's model page)
 - `temperature: 1.0` (use **0.6 for 0.9B**), `top_p: 0.95`
@@ -12,12 +14,20 @@ The server speaks the OpenAI chat-completions API at `http://127.0.0.1:8080/v1`.
 import json, re, urllib.request
 
 def split_output(raw):
-    """(thinking, answer) from K2 Horizon's raw text. Tag names vary by effort: <ifm|think>, <ifm|think_fast>, …"""
+    """(thinking, answer) from raw K2 Horizon text. Accepts any closing tag: </ifm|think>, </ifm|think_fast>, …"""
     parts = re.split(r"</ifm\|think\w*>", raw, maxsplit=1)
     thinking, answer = (parts[0], parts[1]) if len(parts) == 2 else ("", raw)
     thinking = re.sub(r"<ifm\|think\w*>", "", thinking)
     answer = re.sub(r"<ifm\|tool_calls>.*?(</ifm\|tool_calls>|$)", "", answer, flags=re.S)
     return thinking.strip(), re.sub(r"</?ifm\|think\w*>", "", answer).strip()
+
+def read_message(m):
+    """(thinking, answer) from a reply. Normally the server has split them; 3.7B at medium effort closes with
+    the wrong tag, which leaves everything in reasoning_content, so split that text here."""
+    reasoning, content = m.get("reasoning_content") or "", m.get("content") or ""
+    if re.search(r"</ifm\|think\w*>", reasoning):
+        return split_output(reasoning + content)
+    return reasoning.strip(), content.strip()
 
 def ask(prompt, effort="medium"):   # the model's own default is "high"; medium is faster for everyday use
     body = {"messages": [{"role": "user", "content": prompt}], "temperature": 1.0, "top_p": 0.95,
@@ -25,7 +35,7 @@ def ask(prompt, effort="medium"):   # the model's own default is "high"; medium 
     req = urllib.request.Request("http://127.0.0.1:8080/v1/chat/completions", json.dumps(body).encode(),
                                  {"Content-Type": "application/json"})
     m = json.load(urllib.request.urlopen(req))["choices"][0]["message"]
-    return split_output((m.get("reasoning_content") or "") + (m.get("content") or ""))[1]
+    return read_message(m)[1]
 
 print(ask("Summarize in one line: dinner moved to 8 PM, stand-up cancelled."))
 ```
@@ -40,12 +50,15 @@ r = client.chat.completions.create(
     temperature=1.0, top_p=0.95,
     extra_body={"chat_template_kwargs": {"reasoning_effort": "low"}},
 )
-raw = (getattr(r.choices[0].message, "reasoning_content", None) or "") + (r.choices[0].message.content or "")
-# then use split_output(raw) from above
+print(r.choices[0].message.content)                              # the answer
+print(getattr(r.choices[0].message, "reasoning_content", None))  # the thinking
+# With 3.7B at medium effort, use read_message(r.choices[0].message.model_dump()) from above instead.
 ```
 
 ## Tool calling
-Pass OpenAI-style `tools` in the request. Because the server runs with `--reasoning-format none`, tool calls arrive inside the text as:
+Pass OpenAI-style `tools` in the request. Tool calls come back in the standard `tool_calls` field, for example `{"type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Dubai\"}"}}`.
+
+The model writes them in its own format, which the server converts:
 ```
 <ifm|tool_calls>
 <ifm|tool_call>send_message
@@ -54,7 +67,7 @@ Pass OpenAI-style `tools` in the request. Because the server runs with `--reason
 </ifm|tool_call>
 </ifm|tool_calls>
 ```
-`split_output()` in `scripts/k2local.py` also returns these as `[{"name": ..., "arguments": {...}}]`. To send the tool result back, add an assistant message with `tool_calls`, then a `{"role": "tool", "tool_call_id": ..., "content": ...}` message. In testing, all three sizes called simple tools correctly. 3.7B and 7B also used the results well.
+With 3.7B at medium effort, the tool call stays in `reasoning_content` in this raw form, and `tool_calls` is empty. `read_message()` in `scripts/k2local.py` parses it into `[{"name": ..., "arguments": {...}}]` in that case. To send the tool result back, add an assistant message with `tool_calls`, then a `{"role": "tool", "tool_call_id": ..., "content": ...}` message. In testing, all three sizes called simple tools correctly. 3.7B and 7B also used the results well.
 
 ## Original format straight from Transformers
 If you downloaded the original format and want the model inside your own Python code (for research or fine-tuning), load the folder with the private environment's Python (`~/k2-horizon-local/python/bin/python`):
