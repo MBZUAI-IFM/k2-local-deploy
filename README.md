@@ -69,8 +69,6 @@ More in [`using-from-code.md`](k2-horizon-local/references/using-from-code.md), 
 
 See [`troubleshooting.md`](k2-horizon-local/references/troubleshooting.md).
 
-Tested on Apple Silicon Macs. Linux and Windows are supported but not yet tested on real hardware.
-
 ## Community and credits
 
 Questions or feedback? Join the IFM Discord: [ifm.ai/discord](https://ifm.ai/discord)
