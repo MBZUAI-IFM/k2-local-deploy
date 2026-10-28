@@ -5,7 +5,7 @@ Two formats, both run with llama.cpp: gguf (compressed, the default) and gguf-bf
 
 Commands (run them in this order the first time):
   python3 k2local.py check                         # what fits on this computer, for each size and format
-  python3 k2local.py install                       # latest llama.cpp for this OS and GPU
+  python3 k2local.py install                       # latest llama.cpp for this OS and GPU (serve keeps it updated)
   python3 k2local.py download --size 3.7B [--format F] [--quant Q]  # download + verify (repeat for others)
   python3 k2local.py serve [--size 3.7B] [--format F]  # start a model in the background, wait until ready
   python3 k2local.py ask "question"                # send a question, print the answer and speed
@@ -17,7 +17,6 @@ Everything lives in one folder (default ~/k2-horizon-local, change with --dir or
 import argparse, hashlib, json, os, platform, re, shutil, signal, subprocess, sys, tarfile, threading, time, zipfile
 import urllib.request, urllib.error
 
-TESTED_BUILD = "b11619"           # the llama.cpp build this skill was tested with; the fallback if the latest fails
 LLAMA_RELEASES = "https://github.com/ggml-org/llama.cpp/releases"
 # Official GGUF repos from IFM. Sizes in GB. "notes" come from our own tests on an Apple M4 Pro (24 GB).
 MODELS = {
@@ -247,11 +246,11 @@ def latest_build():
     60 anonymous calls an hour per network, which a shared office network used up. Stable releases (v0.x) name their
     build in nightly-tag.txt. None if it can't be found."""
     try:
-        with urllib.request.urlopen(urllib.request.Request(f"{LLAMA_RELEASES}/latest", headers=UA), timeout=30) as r:
+        with urllib.request.urlopen(urllib.request.Request(f"{LLAMA_RELEASES}/latest", headers=UA), timeout=15) as r:
             tag = r.geturl().rstrip("/").rsplit("/", 1)[-1]
         if not re.fullmatch(r"b\d+", tag):
             with urllib.request.urlopen(urllib.request.Request(f"{LLAMA_RELEASES}/download/{tag}/nightly-tag.txt",
-                                                               headers=UA), timeout=30) as r:
+                                                               headers=UA), timeout=15) as r:
                 tag = r.read().decode().strip()
         return tag if re.fullmatch(r"b\d+", tag) else None
     except Exception:
@@ -317,24 +316,23 @@ def cmd_install():
     root = os.path.join(home(), "llama")
     st = load_state()
     if find_server(root) and not ARGS.force:
-        say(f"✓ llama.cpp {st.get('build') or ''} already installed: {find_server(root)}  (to update: install --force)"); return
+        say(f"✓ llama.cpp {st.get('build') or ''} already installed: {find_server(root)}  (serve updates it when a newer release is out)"); return
     if find_server(root) and pid_alive(st.get("pid")):
         raise SystemExit("The model is running from the installed llama.cpp. Run stop first, then install --force.")
-    if ARGS.build == "latest":
-        latest = latest_build()
-        if not latest:
-            say(f"Couldn't look up the latest llama.cpp release, so using {TESTED_BUILD}, the build tested with this skill.")
-        builds = [b for b in (latest, TESTED_BUILD) if b]
-    else:
-        builds = [TESTED_BUILD if ARGS.build == "tested" else ARGS.build]
-    for build in builds:
-        archives = fetch_llama(build, backend)
-        if archives:
-            break
-        if build != builds[-1]:
-            say(f"llama.cpp {build} has no download for this computer; using {TESTED_BUILD}, the build tested with this skill.")
-    else:
-        raise SystemExit(f"✗ llama.cpp {builds[-1]} has no {' + '.join(choose_asset(builds[-1], backend))}. "
+    build = ARGS.build if ARGS.build != "latest" else latest_build()
+    if not build:
+        raise SystemExit(f"✗ Couldn't look up the latest llama.cpp release at {LLAMA_RELEASES}/latest. "
+                         "Check the internet connection and run install again.")
+    install_llama(build, backend, pinned=ARGS.build != "latest")
+
+
+def install_llama(build, backend, pinned=False):
+    """Download this build and replace the installed llama.cpp with it. pinned: the user chose this build,
+    so serve doesn't update it."""
+    root = os.path.join(home(), "llama")
+    archives = fetch_llama(build, backend)
+    if not archives:
+        raise SystemExit(f"✗ llama.cpp {build} has no {' + '.join(choose_asset(build, backend))}. "
                          f"See {LLAMA_RELEASES} or try --backend cpu.")
     shutil.rmtree(root, ignore_errors=True)   # an update must not leave the old llama-server next to the new one
     os.makedirs(root)
@@ -357,8 +355,23 @@ def cmd_install():
         subprocess.run(["xattr", "-dr", "com.apple.quarantine", root], stderr=subprocess.DEVNULL)  # macOS blocks downloaded binaries otherwise
     out = subprocess.run([server, "--version"], capture_output=True, text=True)
     say((out.stdout + out.stderr).strip().splitlines()[0] if (out.stdout + out.stderr).strip() else "(no version output)")
-    save_state(server=server, backend=backend, build=build)
-    say(f"✓ llama.cpp {build} ({backend}) installed" + (" (the build tested with this skill)." if build == TESTED_BUILD else "."))
+    save_state(server=server, backend=backend, build=build, build_pinned=pinned)
+    say(f"✓ llama.cpp {build} ({backend}) installed.")
+
+
+def update_llama(st):
+    """Before starting the model, move to the newest llama.cpp release if there is one. If the lookup or the
+    download fails (offline, for example), keep the installed build and carry on."""
+    if st.get("build_pinned") or ARGS.no_update:
+        return
+    latest = latest_build()
+    if not latest or latest == st.get("build"):
+        return
+    say(f"Updating llama.cpp {st.get('build') or ''} → {latest} …")
+    try:
+        install_llama(latest, st.get("backend") or "cpu")
+    except SystemExit as e:
+        say(f"{e}\nKeeping llama.cpp {st.get('build')}.")
 
 
 # ---------------------------------------------------------------- download the model
@@ -540,8 +553,7 @@ def cmd_serve():
         fmt_flag = f" --format {key_format(key)}" if key and key_format(key) != "gguf" else ""
         raise SystemExit(f"{label(key) if key else 'That size'} isn't downloaded yet (downloaded: {have}). "
                          f"Run: download --size {size}{fmt_flag}")
-    server = st.get("server")
-    if not server or not os.path.exists(server):
+    if not st.get("server") or not os.path.exists(st["server"]):
         raise SystemExit("llama.cpp isn't installed yet. Run: install")
     model = models[key]["path"]
     if port_in_use():
@@ -551,10 +563,13 @@ def cmd_serve():
                 return say_how_to_use()
             raise SystemExit(f"{label(st.get('serving') or '?')} is running. Run stop first, then serve again.")
         raise SystemExit(f"✗ Port {ARGS.port} is used by another program. Stop it, or pick another port: --port 8081 (use it with ask too).")
+    update_llama(st)
+    server = load_state()["server"]
     log = open(os.path.join(home(), "server.log"), "w")
     # llama.cpp recognizes K2 Horizon's tags: replies come back as reasoning_content, content and tool_calls.
+    # High reasoning is the default for every client, the web chat included; a request can still ask for less.
     cmd = [server, "-m", model, "--host", "127.0.0.1", "--port", str(ARGS.port), "--jinja",
-           "-c", str(ARGS.ctx), "-ngl", "99"]
+           "-c", str(ARGS.ctx), "-ngl", "99", "--chat-template-kwargs", json.dumps({"reasoning_effort": "high"})]
     kw = {"stdout": log, "stderr": log, "cwd": os.path.dirname(server)}
     if platform.system() == "Windows":
         kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
@@ -655,7 +670,7 @@ def cmd_ask():
     size = label(key) if key else None
     temp = MODELS.get(key_size(key) if key else "", {}).get("temp", 1.0)   # IFM: 0.6 for 0.9B, 1.0 for the others
     body = {"messages": [{"role": "user", "content": ARGS.prompt}], "temperature": temp, "top_p": 0.95,
-            "max_tokens": ARGS.max_tokens, "chat_template_kwargs": {"reasoning_effort": ARGS.effort}}
+            "chat_template_kwargs": {"reasoning_effort": ARGS.effort}, **max_tokens()}
     req = urllib.request.Request(f"http://127.0.0.1:{ARGS.port}/v1/chat/completions", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     t0 = time.time()
@@ -670,6 +685,11 @@ def cmd_ask():
         say(f"── tool call ── {c['name']}({json.dumps(c['arguments'], ensure_ascii=False)})")
     tps = res.get("timings", {}).get("predicted_per_second")
     say(f"\n{size or 'model'} · {time.time() - t0:.1f}s · {res.get('usage', {}).get('completion_tokens', '?')} tokens" + (f" · {tps:.0f} tokens/s" if tps else ""))
+
+
+def max_tokens():
+    """No limit by default: high reasoning can think for thousands of tokens, and a cap cut off answers."""
+    return {"max_tokens": ARGS.max_tokens} if ARGS.max_tokens else {}
 
 
 # ---------------------------------------------------------------- chat
@@ -715,8 +735,8 @@ def cmd_chat():
 
 def stream_reply(messages, temp, effort):
     """Print the answer as it arrives and return it. While the model thinks, show a 'thinking…' placeholder."""
-    body = {"messages": messages, "temperature": temp, "top_p": 0.95, "max_tokens": ARGS.max_tokens, "stream": True,
-            "chat_template_kwargs": {"reasoning_effort": effort}}
+    body = {"messages": messages, "temperature": temp, "top_p": 0.95, "stream": True,
+            "chat_template_kwargs": {"reasoning_effort": effort}, **max_tokens()}
     req = urllib.request.Request(f"http://127.0.0.1:{ARGS.port}/v1/chat/completions", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     reasoning, content, thinking, started, tps = "", "", False, False, None
@@ -773,9 +793,9 @@ def open_chat_window():
 
 # ---------------------------------------------------------------- main
 def build_arg(s):
-    if re.fullmatch(r"latest|tested|b\d+", s):
+    if re.fullmatch(r"latest|b\d+", s):
         return s
-    raise argparse.ArgumentTypeError(f"use latest, tested or a build like {TESTED_BUILD}")
+    raise argparse.ArgumentTypeError("use latest, or a build number like b11669")
 
 
 def main():
@@ -790,16 +810,17 @@ def main():
     sp("check")
     fmts = list(FORMATS)
     p = sp("install"); p.add_argument("--backend", default="auto", choices=["auto", "cpu", "cuda", "vulkan"]); p.add_argument("--force", action="store_true")
-    p.add_argument("--build", default="latest", type=build_arg, help=f"llama.cpp build: latest (default), tested ({TESTED_BUILD}), or a specific one like {TESTED_BUILD}")
+    p.add_argument("--build", default="latest", type=build_arg, help="llama.cpp build: latest (default), or a build number like b11669 to stay on it (serve then won't update it)")
     p = sp("download"); p.add_argument("--size", choices=list(MODELS)); p.add_argument("--format", default="gguf", choices=fmts)
     p.add_argument("--quant", choices=["Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "BF16"], help="GGUF file to use (BF16 = --format gguf-bf16)")
     p = sp("serve"); p.add_argument("--size", choices=list(MODELS)); p.add_argument("--format", choices=fmts, help="default: the last one used for that size")
     p.add_argument("--ctx", type=int, default=16384)
-    p = sp("ask"); p.add_argument("prompt"); p.add_argument("--effort", default="medium", choices=["low", "medium", "high"],
-                   help="the model's own default is high; ask uses medium so quick checks are fast")
-    p.add_argument("--max-tokens", type=int, default=4096); p.add_argument("--show-thinking", action="store_true")
-    p = sp("chat"); p.add_argument("--effort", default="medium", choices=["low", "medium", "high"])
-    p.add_argument("--max-tokens", type=int, default=8192); p.add_argument("--window", action="store_true", help="open the chat in a new terminal window")
+    p.add_argument("--no-update", action="store_true", help="don't check for a newer llama.cpp before starting")
+    p = sp("ask"); p.add_argument("prompt"); p.add_argument("--effort", default="high", choices=["low", "medium", "high"],
+                   help="how much the model thinks first (default high, the most careful)")
+    p.add_argument("--max-tokens", type=int, help="limit the reply length (default: no limit)"); p.add_argument("--show-thinking", action="store_true")
+    p = sp("chat"); p.add_argument("--effort", default="high", choices=["low", "medium", "high"])
+    p.add_argument("--max-tokens", type=int, help="limit each reply's length (default: no limit)"); p.add_argument("--window", action="store_true", help="open the chat in a new terminal window")
     sp("status"); sp("stop")
     ARGS = ap.parse_args()
     ARGS.dir = getattr(ARGS, "dir", None)

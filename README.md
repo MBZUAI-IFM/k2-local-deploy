@@ -43,9 +43,9 @@ These are compressed files. For full quality, add `--format gguf-bf16` to `downl
 | Command | What it does |
 |---|---|
 | `check` | Shows what fits your computer and recommends a size |
-| `install` | Downloads the latest llama.cpp for your system (`--force` to update) |
+| `install` | Downloads the latest llama.cpp for your system |
 | `download --size …` | Downloads and verifies a model |
-| `serve --size …` | Starts the model at `http://127.0.0.1:8080` |
+| `serve --size …` | Updates llama.cpp if a newer release is out, then starts the model at `http://127.0.0.1:8080` |
 | `chat` | Chats in the terminal (`--window` opens a new window) |
 | `ask "…"` | Asks one question |
 | `status` / `stop` | Shows what's running / stops it |

@@ -80,7 +80,7 @@ Then offer the format, in one short message with the two one-sentence explanatio
 ```
 python3 k2local.py install
 ```
-This downloads the latest llama.cpp release, choosing the right build for the OS and GPU: Metal on Apple Silicon, CUDA for NVIDIA, Vulkan or CPU otherwise. It downloads straight from llama.cpp's GitHub releases page without using the GitHub API, which allows only 60 anonymous calls an hour per network and failed on a shared office network. If the latest release can't be found or has no file for this computer, it installs build b11619, the one tested with this skill, and says so. `--build tested` installs b11619 directly, for example if the model misbehaves on a newer build. To update an existing install to the latest release, run `stop`, then `install --force`. On macOS it also removes the "downloaded from the internet" quarantine flag that would otherwise block the program. To override the choice, use `--backend cpu|cuda|vulkan`, for example if the CUDA build fails to start.
+This downloads the latest llama.cpp release, choosing the right build for the OS and GPU: Metal on Apple Silicon, CUDA for NVIDIA, Vulkan or CPU otherwise. It downloads straight from llama.cpp's GitHub releases page without using the GitHub API, which allows only 60 anonymous calls an hour per network and failed on a shared office network. There's no pinned version: every time `serve` starts the model, it checks for a newer llama.cpp release and updates first if there is one (a ~30 MB download). If the check fails, for example offline, it starts with the installed build. `serve --no-update` skips the check. To stay on one build, install it by number, for example `install --force --build b11669`; `serve` then leaves it alone until `install --force` goes back to the latest. On macOS it also removes the "downloaded from the internet" quarantine flag that would otherwise block the program. To override the choice, use `--backend cpu|cuda|vulkan`, for example if the CUDA build fails to start.
 
 ### 4. Download the chosen size and format
 ```
@@ -93,7 +93,7 @@ This downloads the official files from IFM's Hugging Face page. For compressed G
 ```
 python3 k2local.py serve --size 3.7B                  # optional: --format gguf | gguf-bf16
 ```
-This starts the model in the background at `http://127.0.0.1:8080` (local only) and waits until it's ready, usually a few seconds. Without `--format`, it uses the format last used for that size. It then prints how to use it: the web chat link (llama-server has a chat page at its address), and the exact `chat`, `ask` and `stop` commands.
+This starts the model in the background at `http://127.0.0.1:8080` (local only) and waits until it's ready, usually a few seconds. It sets high reasoning as the default for everything that talks to it, including the web chat. Without `--format`, it uses the format last used for that size. It then prints how to use it: the web chat link (llama-server has a chat page at its address), and the exact `chat`, `ask` and `stop` commands.
 
 The model runs in llama-server, which offers an OpenAI-compatible API (`/v1/chat/completions`, with streaming and tools, plus `/health`), used by `ask`, `chat` and everything in [using-from-code.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/using-from-code.md).
 
@@ -120,7 +120,7 @@ You run commands in the background, so a chat started there can't take the user'
 
 Then tell the user, in plain language:
 - Which size is running, and that their data stays on their machine.
-- **The chat window:** type a message and press Enter. `/new` starts a new conversation, `/effort low|medium|high` changes how much it thinks (`medium` by default, which is fast; `high` is the model's own default, slower and more careful), and `/exit` closes it. To open it again later, use the exact `Chat:` command that `serve` printed. It includes the full script path, plus `--dir` or `--port` when they aren't the defaults, so the user can copy it as is.
+- **The chat window:** type a message and press Enter. `/new` starts a new conversation, `/effort low|medium|high` changes how much it thinks (`high` by default, the most careful; `low` is faster for quick questions), and `/exit` closes it. To open it again later, use the exact `Chat:` command that `serve` printed. It includes the full script path, plus `--dir` or `--port` when they aren't the defaults, so the user can copy it as is.
 - **The web chat:** give the `Web chat:` link that `serve` printed, normally `http://127.0.0.1:8080`, to open in a browser. It only works on this computer, and only while the model is running.
 - For a single question from the command line, the `Ask:` command that `serve` printed.
 - To use it from code or other apps: it speaks the OpenAI chat API at `/v1`. See [using-from-code.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/using-from-code.md).

@@ -29,7 +29,7 @@ def read_message(m):
         return split_output(reasoning + content)
     return reasoning.strip(), content.strip()
 
-def ask(prompt, effort="medium"):   # the model's own default is "high"; medium is faster for everyday use
+def ask(prompt, effort="high"):   # the most careful; "low" is faster for quick questions
     body = {"messages": [{"role": "user", "content": prompt}], "temperature": 1.0, "top_p": 0.95,
             "chat_template_kwargs": {"reasoning_effort": effort}}
     req = urllib.request.Request("http://127.0.0.1:8080/v1/chat/completions", json.dumps(body).encode(),
