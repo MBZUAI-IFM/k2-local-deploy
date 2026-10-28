@@ -80,7 +80,7 @@ Then offer the format, in one short message with the two one-sentence explanatio
 ```
 python3 k2local.py install
 ```
-This downloads the latest llama.cpp release, choosing the right build for the OS and GPU: Metal on Apple Silicon, CUDA for NVIDIA, Vulkan or CPU otherwise. It downloads straight from llama.cpp's GitHub releases page without using the GitHub API, which allows only 60 anonymous calls an hour per network and failed on a shared office network. There's no pinned version: every time `serve` starts the model, it checks for a newer llama.cpp release and updates first if there is one (a ~30 MB download). If the check fails, for example offline, it starts with the installed build. `serve --no-update` skips the check. To stay on one build, install it by number, for example `install --force --build b11669`; `serve` then leaves it alone until `install --force` goes back to the latest. On macOS it also removes the "downloaded from the internet" quarantine flag that would otherwise block the program. To override the choice, use `--backend cpu|cuda|vulkan`, for example if the CUDA build fails to start.
+This downloads llama.cpp build b11619, the one K2 Horizon was tested with, choosing the right file for the OS and GPU: Metal on Apple Silicon, CUDA for NVIDIA, Vulkan or CPU otherwise. It downloads straight from llama.cpp's GitHub releases page without using the GitHub API, which allows only 60 anonymous calls an hour per network and failed on a shared office network. It never updates by itself. Only if the user asks for a newer llama.cpp, run `stop`, then `install --build latest` (or a build number such as `--build b11669`), and tell them it hasn't been tested with K2 Horizon. `install --build tested` goes back to b11619. On macOS it also removes the "downloaded from the internet" quarantine flag that would otherwise block the program. To override the choice, use `--backend cpu|cuda|vulkan`, for example if the CUDA build fails to start.
 
 ### 4. Download the chosen size and format
 ```
@@ -93,7 +93,7 @@ This downloads the official files from IFM's Hugging Face page. For compressed G
 ```
 python3 k2local.py serve --size 3.7B                  # optional: --format gguf | gguf-bf16
 ```
-This starts the model in the background at `http://127.0.0.1:8080` (local only) and waits until it's ready, usually a few seconds. It sets high reasoning as the default for everything that talks to it, including the web chat. Without `--format`, it uses the format last used for that size. It then prints how to use it: the web chat link (llama-server has a chat page at its address), and the exact `chat`, `ask` and `stop` commands.
+This starts the model in the background at `http://127.0.0.1:8080` (local only) and waits until it's ready, usually a few seconds. It sets IFM's recommended settings as the defaults for everything that talks to it, including the web chat and other apps: high reasoning, `top_p` 0.95, and temperature 1.0 (0.6 for 0.9B). Without `--format`, it uses the format last used for that size. It then prints how to use it: the web chat link (llama-server has a chat page at its address), and the exact `chat`, `ask` and `stop` commands.
 
 The model runs in llama-server, which offers an OpenAI-compatible API (`/v1/chat/completions`, with streaming and tools, plus `/health`), used by `ask`, `chat` and everything in [using-from-code.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/using-from-code.md).
 
@@ -132,6 +132,6 @@ Then tell the user, in plain language:
 Read `references/troubleshooting.md` next to this file or, if it isn't there, [troubleshooting.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/troubleshooting.md) on GitHub. It covers the problems actually seen: empty answers, slow output, stalled downloads, GitHub's rate limit, macOS blocking the program, the server quitting on load, and a busy port. `k2local.py status` shows what's downloaded, which size is running, and the port. `server.log` in the storage folder has the server's own messages.
 
 ## Recommended settings (from IFM's model pages)
-- `top_p 0.95`. `temperature 1.0`, except **0.9B, which uses 0.6**. `ask` sets this automatically.
+- `top_p 0.95`. `temperature 1.0`, except **0.9B, which uses 0.6**. `serve` makes these the server's defaults.
 - `reasoning_effort`: `high` (default), `medium` or `low`, sent as `chat_template_kwargs: {"reasoning_effort": "…"}`.
 - Give hard tasks plenty of output tokens. IFM suggests up to 32,768.

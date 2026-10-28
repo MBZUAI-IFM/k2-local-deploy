@@ -19,8 +19,8 @@ On a computer with no GPU, a few tokens per second is normal.
 **Cause:** older versions of the script asked the GitHub API for the llama.cpp download link. GitHub allows only 60 anonymous API calls an hour per network, and on a shared office network everyone's apps count toward the same 60. Seen on an office network, while the model download from Hugging Face worked fine.
 **Fix:** get the current script (rerun step 0 in `SKILL.md`). It downloads llama.cpp straight from the releases page and doesn't use the API. With an old script, wait an hour, or run `install` once on another network such as a phone hotspot.
 
-## Problems after llama.cpp updated itself
-`serve` moves to the newest llama.cpp release when one comes out. If answers look wrong or empty, or the server won't start after an update, go back to the build that worked, for example b11669: `stop`, `install --force --build b11669`, then `serve`. A build installed by number stays until you run `install --force` again. `status` shows the installed build. To start without checking for updates once, use `serve --no-update`.
+## Problems after switching to a newer llama.cpp
+`install` uses build b11619, the one tested with K2 Horizon, and never updates by itself. If you installed a newer one with `install --build latest` and answers look wrong or empty, or the server won't start, go back: `stop`, `install --build tested`, then `serve`. `status` shows the installed build.
 
 ## "Checksum mismatch"
 The file was damaged in transit. The script renamed it to `.bad`. Delete that file and run `download` again.

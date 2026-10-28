@@ -5,7 +5,7 @@ The server speaks the OpenAI chat-completions API at `http://127.0.0.1:8080/v1`.
 Replies come back already split: the thinking in `reasoning_content`, the answer in `content`, and tool calls in `tool_calls`. The one exception is 3.7B at medium effort, which closes its thinking with the wrong tag, so the answer lands in `reasoning_content` and `content` is empty. `read_message()` below handles that case.
 
 ## Settings (from IFM's model page)
-- `temperature: 1.0` (use **0.6 for 0.9B**), `top_p: 0.95`
+- `temperature: 1.0` (use **0.6 for 0.9B**), `top_p: 0.95`. `serve` already makes these, and high reasoning, the server's defaults, so you only need to send them to change them.
 - `chat_template_kwargs: {"reasoning_effort": "low" | "medium" | "high"}`. `high` is the default and the most careful.
 - Give hard tasks plenty of `max_tokens`. The thinking counts toward the limit.
 
