@@ -22,8 +22,6 @@ python3 k2-horizon-local/scripts/k2local.py chat                   # chat in the
 
 On Windows, use `py` instead of `python3`.
 
-While it's running, you can also chat in your browser at **http://127.0.0.1:8080**. Stop it with `stop`. Next time, just run `serve`.
-
 ## Which size?
 
 | Size | Best for | Download | Speed* |
@@ -51,19 +49,6 @@ These are compressed files. For full quality, add `--format gguf-bf16` to `downl
 | `status` / `stop` | Shows what's running / stops it |
 
 Everything is stored in `~/k2-horizon-local`. To remove it all, delete that folder.
-
-## Use it from code
-
-The model speaks the OpenAI API at `http://127.0.0.1:8080/v1`:
-
-```python
-from openai import OpenAI
-client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="not-needed")
-reply = client.chat.completions.create(model="k2-horizon", messages=[{"role": "user", "content": "Hello!"}])
-print(reply.choices[0].message.content)
-```
-
-More in [`using-from-code.md`](k2-horizon-local/references/using-from-code.md), including tool calling.
 
 ## Something went wrong?
 
