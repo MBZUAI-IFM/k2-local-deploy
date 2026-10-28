@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Model files and runtime data (never commit these; they're downloaded by the script)
+*.gguf
+*.gguf.part*
+*.bad
+server.log
+state.json

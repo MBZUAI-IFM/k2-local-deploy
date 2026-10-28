@@ -126,7 +126,7 @@ The answer is in `reply.choices[0].message.content` and the model's thinking in 
 
 All you need is one file: [**`SKILL.md`**](k2-horizon-local/SKILL.md). It has the step-by-step instructions, and the agent fetches the setup script from this repository by itself. It checks your computer, shows you the size and format options and lets you choose, then installs, starts and tests the model.
 
-- **Agents that support skills (such as Claude Code):** put `SKILL.md` in a folder named `k2-horizon-local` inside the agent's skills folder (for Claude Code, `~/.claude/skills/k2-horizon-local/SKILL.md`), then ask something like *"Set up K2 Horizon on my laptop."*
+- **Agents that support skills:** put `SKILL.md` in a folder named `k2-horizon-local` inside the agent's skills folder, then ask something like *"Set up K2 Horizon on my laptop."*
 - **Any other agent that can run commands:** give it `SKILL.md` (attach the file, or paste the link) and ask it to *"follow this to set up K2 Horizon on my computer."*
 
 If you downloaded the whole repository, the agent uses the script that's already here instead.
