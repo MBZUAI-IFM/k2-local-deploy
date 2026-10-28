@@ -18,7 +18,7 @@
     <!-- sources -->
     <rect x="430" y="118" width="340" height="104" rx="16" fill="#E8F2EA" stroke="#376E6D" stroke-width="2"/>
     <text x="452" y="150" font-size="13" font-weight="700" letter-spacing="2" fill="#376E6D">1 · INSTALL</text>
-    <text x="452" y="178" font-size="19" font-weight="800" fill="#141414">llama.cpp (build b11619)</text>
+    <text x="452" y="178" font-size="19" font-weight="800" fill="#141414">llama.cpp (latest release)</text>
     <text x="452" y="203" font-size="14" fill="#525252">github.com/ggml-org/llama.cpp releases</text>
 
     <rect x="430" y="248" width="340" height="120" rx="16" fill="#FBF2EB" stroke="#E25727" stroke-width="2"/>

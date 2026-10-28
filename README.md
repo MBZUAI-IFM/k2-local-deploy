@@ -22,7 +22,7 @@ This repository contains only the setup script and its instructions. Nothing is 
 1. **llama.cpp**, the open-source program that runs the model, from its official GitHub releases.
 2. **The K2 Horizon model** in GGUF format, from IFM's official Hugging Face page, and checks it against IFM's published checksum.
 
-It then starts the model on your computer at `http://127.0.0.1:8080`.
+It then starts the model on your computer, opens a chat with it in a terminal window, and gives you a local web chat at `http://127.0.0.1:8080`.
 
 That's the default, compressed GGUF format: one file made for laptops and phones. The 7B model is 18 GB in full precision, while compressed GGUF is 5.6–9.6 GB and runs on any Mac, Windows or Linux machine. If you want full precision, see [Which format?](#which-format) below.
 
@@ -76,9 +76,10 @@ python3 k2-horizon-local/scripts/k2local.py install                # get llama.c
 python3 k2-horizon-local/scripts/k2local.py download --size 3.7B   # pick 0.9B, 3.7B or 7B
 python3 k2-horizon-local/scripts/k2local.py serve --size 3.7B      # start it
 python3 k2-horizon-local/scripts/k2local.py ask "Split 86 equally between 3 people. How much does each get?"
+python3 k2-horizon-local/scripts/k2local.py chat                   # chat with it in the terminal
 ```
 
-On Windows, use `py` instead of `python3`.
+On Windows, use `py` instead of `python3`. While it's running, you can also chat in your browser at `http://127.0.0.1:8080`.
 
 Here's `check` on a 24 GB Mac:
 
@@ -95,10 +96,11 @@ When you're done, stop it with `… k2local.py stop`. Next time, just run `serve
 | Command | What it does |
 |---|---|
 | `check` | Shows your memory, disk and GPU, how well each size and format fits, and a recommendation |
-| `install` | Downloads llama.cpp for your OS and GPU (Metal, CUDA, Vulkan or CPU). Use `--backend cpu` to force the CPU build. With `--format original`, sets up PyTorch and Transformers in a private environment instead |
+| `install` | Downloads the latest llama.cpp for your OS and GPU (Metal, CUDA, Vulkan or CPU), falling back to the tested build b11619 if needed. Use `--build tested` for b11619, `--force` to update, or `--backend cpu` to force the CPU build. With `--format original`, sets up PyTorch and Transformers in a private environment instead |
 | `download --size 0.9B\|3.7B\|7B` | Downloads and verifies a model. Add `--format gguf-bf16\|original` for another format, or `--quant Q4_K_M\|Q5_K_M\|Q6_K\|Q8_0` to choose the compressed file yourself |
-| `serve [--size …] [--format …]` | Starts the model in the background at `http://127.0.0.1:8080` |
+| `serve [--size …] [--format …]` | Starts the model in the background at `http://127.0.0.1:8080`, which is also a web chat (GGUF formats) |
 | `ask "…"` | Asks a question. Add `--effort low\|medium\|high` to control how much it thinks, and `--show-thinking` to see its reasoning |
+| `chat` | Chats with the model in the terminal. `--window` opens the chat in a new terminal window. Inside it: `/new`, `/effort low\|medium\|high`, `/exit` |
 | `status` | Shows what's downloaded and what's running |
 | `stop` | Stops the model and frees the memory |
 

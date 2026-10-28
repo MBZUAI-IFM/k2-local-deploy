@@ -83,7 +83,7 @@ Then offer the format, in one short message with the three one-sentence explanat
 python3 k2local.py install                       # for the GGUF formats (compressed or BF16)
 python3 k2local.py install --format original     # for the original format
 ```
-The first downloads llama.cpp build b11619, the one tested with this skill, choosing the right build for the OS and GPU: Metal on Apple Silicon, CUDA for NVIDIA, Vulkan or CPU otherwise. On macOS it also removes the "downloaded from the internet" quarantine flag that would otherwise block the program. To override the choice, use `--backend cpu|cuda|vulkan`, for example if the CUDA build fails to start.
+The first downloads the latest llama.cpp release, choosing the right build for the OS and GPU: Metal on Apple Silicon, CUDA for NVIDIA, Vulkan or CPU otherwise. It downloads straight from llama.cpp's GitHub releases page without using the GitHub API, which allows only 60 anonymous calls an hour per network and failed on a shared office network. If the latest release can't be found or has no file for this computer, it installs build b11619, the one tested with this skill, and says so. `--build tested` installs b11619 directly, for example if the model misbehaves on a newer build. To update an existing install to the latest release, run `stop`, then `install --force`. On macOS it also removes the "downloaded from the internet" quarantine flag that would otherwise block the program. To override the choice, use `--backend cpu|cuda|vulkan`, for example if the CUDA build fails to start.
 
 `--format original` instead creates a private Python environment in `~/k2-horizon-local/python` and installs the versions IFM validated: PyTorch 2.13.0, Transformers 5.15.0 and Safetensors 0.8.0 (about 850 MB on a Mac; more on Linux, where PyTorch includes CUDA). Nothing is installed system-wide. It needs Python 3.10 or newer, and finds one if the current Python is older. At the end it prints where the model will run: `cuda`, `mps` (Apple GPU) or `cpu`. Install both if the user wants to try both kinds of format.
 
@@ -99,7 +99,7 @@ This downloads the official files from IFM's Hugging Face page. For compressed G
 ```
 python3 k2local.py serve --size 3.7B                  # optional: --format gguf | gguf-bf16 | original
 ```
-This starts the model in the background at `http://127.0.0.1:8080` (local only) and waits until it's ready, usually a few seconds. Without `--format`, it uses the format last used for that size.
+This starts the model in the background at `http://127.0.0.1:8080` (local only) and waits until it's ready, usually a few seconds. Without `--format`, it uses the format last used for that size. It then prints how to use it: the web chat link (GGUF formats only; llama-server has a chat page at its address), and the exact `chat`, `ask` and `stop` commands.
 
 The GGUF formats run in llama-server. The original format runs in `original_server.py`, a small server using the private Python environment. It offers the same API (`/v1/chat/completions`, with streaming and tools, plus `/health`), so `ask` and everything in [using-from-code.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/using-from-code.md) work the same way.
 
@@ -118,16 +118,24 @@ Expect 28⅔ (about 28.67) and a speed line. Answers vary a little between runs:
 Show the user the answer and the speed. If they like, ask one question of their own.
 
 ### 7. Hand it over
-Tell the user, in plain language:
-- Which size is running, at `http://127.0.0.1:8080`, and that their data stays on their machine.
-- To chat: use the exact `Ask:` command that `serve` printed. It includes the full script path, plus `--dir` or `--port` when they aren't the defaults, so the user can copy it as is. It uses `medium` thinking by default, which is fast. Add `--effort high` for hard questions (the model's own default, slower and more careful) or `--effort low` for quick ones.
+First open a chat for the user in a new terminal window:
+```
+python3 k2local.py chat --window
+```
+You run commands in the background, so a chat started there can't take the user's typing. `--window` opens a separate terminal window where the user talks to the model directly (Terminal on macOS, a console window on Windows, the desktop's terminal on Linux). If it prints that it couldn't open a window, give the user the command it printed to run in their own terminal.
+
+Then tell the user, in plain language:
+- Which size is running, and that their data stays on their machine.
+- **The chat window:** type a message and press Enter. `/new` starts a new conversation, `/effort low|medium|high` changes how much it thinks (`medium` by default, which is fast; `high` is the model's own default, slower and more careful), and `/exit` closes it. To open it again later, use the exact `Chat:` command that `serve` printed. It includes the full script path, plus `--dir` or `--port` when they aren't the defaults, so the user can copy it as is.
+- **The web chat:** give the `Web chat:` link that `serve` printed, normally `http://127.0.0.1:8080`, to open in a browser. It only works on this computer, and only while the model is running. The original format has no web chat; use the chat window.
+- For a single question from the command line, the `Ask:` command that `serve` printed.
 - To use it from code or other apps: it speaks the OpenAI chat API at `/v1`. See [using-from-code.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/using-from-code.md).
 - To try another size or format: `download --size … [--format …]`, then `stop`, then `serve --size … [--format …]`.
 - To stop: `stop`. It confirms the server exited and the port is free. To start again later, run `serve`; install and download only happen once.
 - To remove everything: delete the `~/k2-horizon-local` folder.
 
 ## When something goes wrong
-Read `references/troubleshooting.md` next to this file or, if it isn't there, [troubleshooting.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/troubleshooting.md) on GitHub. It covers the problems actually seen: empty answers, slow output, stalled downloads, macOS blocking the program, the server quitting on load, and a busy port. `k2local.py status` shows what's downloaded, which size is running, and the port. `server.log` in the storage folder has the server's own messages.
+Read `references/troubleshooting.md` next to this file or, if it isn't there, [troubleshooting.md](https://raw.githubusercontent.com/MBZUAI-IFM/k2-local-deploy/main/k2-horizon-local/references/troubleshooting.md) on GitHub. It covers the problems actually seen: empty answers, slow output, stalled downloads, GitHub's rate limit, macOS blocking the program, the server quitting on load, and a busy port. `k2local.py status` shows what's downloaded, which size is running, and the port. `server.log` in the storage folder has the server's own messages.
 
 ## Recommended settings (from IFM's model pages)
 - `top_p 0.95`. `temperature 1.0`, except **0.9B, which uses 0.6**. `ask` sets this automatically.

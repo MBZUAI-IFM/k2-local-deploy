@@ -15,6 +15,13 @@ On a computer with no GPU, a few tokens per second is normal.
 **Cause:** the computer went to sleep (the test Mac slept after 1 idle minute, which froze the download), or a single connection stalled.
 **Fix:** rerun `download`. It resumes from where it stopped, uses 8 parallel connections, and keeps the computer awake (`caffeinate` on macOS, `SetThreadExecutionState` on Windows). On Linux, keep the session active or use `systemd-inhibit`.
 
+## `install` fails with "HTTP Error 403: rate limit exceeded"
+**Cause:** older versions of the script asked the GitHub API for the llama.cpp download link. GitHub allows only 60 anonymous API calls an hour per network, and on a shared office network everyone's apps count toward the same 60. Seen on an office network, while the model download from Hugging Face worked fine.
+**Fix:** get the current script (rerun step 0 in `SKILL.md`). It downloads llama.cpp straight from the releases page and doesn't use the API. With an old script, wait an hour, or run `install` once on another network such as a phone hotspot.
+
+## Problems after updating llama.cpp
+`install` gets the latest llama.cpp release, but this skill was tested with build b11619. If answers look wrong or empty, or the server won't start, go back to the tested build: `stop`, `install --force --build tested`, then `serve`. `status` shows which build is installed.
+
 ## "Checksum mismatch"
 The file was damaged in transit. The script renamed it to `.bad`. Delete that file and run `download` again.
 

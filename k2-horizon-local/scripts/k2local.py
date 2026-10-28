@@ -6,10 +6,11 @@ original runs IFM's safetensors files with PyTorch + Transformers in a private P
 
 Commands (run them in this order the first time):
   python3 k2local.py check                         # what fits on this computer, for each size and format
-  python3 k2local.py install [--format original]   # llama.cpp for this OS (or the Python environment for original)
+  python3 k2local.py install [--format original]   # latest llama.cpp for this OS (or the Python environment for original)
   python3 k2local.py download --size 3.7B [--format F] [--quant Q]  # download + verify (repeat for others)
   python3 k2local.py serve [--size 3.7B] [--format F]  # start a model in the background, wait until ready
   python3 k2local.py ask "question"                # send a question, print the answer and speed
+  python3 k2local.py chat [--window]               # chat in the terminal (--window: in a new terminal window)
   python3 k2local.py status | stop
 
 Everything lives in one folder (default ~/k2-horizon-local, change with --dir or K2_DIR).
@@ -17,7 +18,8 @@ Everything lives in one folder (default ~/k2-horizon-local, change with --dir or
 import argparse, hashlib, json, os, platform, re, shutil, signal, subprocess, sys, tarfile, threading, time, zipfile
 import urllib.request, urllib.error
 
-LLAMA_BUILD = "b11619"            # the build this skill was tested with
+TESTED_BUILD = "b11619"           # the llama.cpp build this skill was tested with; the fallback if the latest fails
+LLAMA_RELEASES = "https://github.com/ggml-org/llama.cpp/releases"
 # Official GGUF repos from IFM. Sizes in GB. "notes" come from our own tests on an Apple M4 Pro (24 GB).
 MODELS = {
     # Note: IFM names the 0.9B files "1B" and the 3.7B files "4B".
@@ -251,10 +253,48 @@ def cmd_check():
 
 
 # ---------------------------------------------------------------- install llama.cpp
-def choose_asset(names, backend):
+def latest_build():
+    """The newest llama.cpp release, from GitHub's /releases/latest redirect rather than the API: the API allows only
+    60 anonymous calls an hour per network, which a shared office network used up. Stable releases (v0.x) name their
+    build in nightly-tag.txt. None if it can't be found."""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(f"{LLAMA_RELEASES}/latest", headers=UA), timeout=30) as r:
+            tag = r.geturl().rstrip("/").rsplit("/", 1)[-1]
+        if not re.fullmatch(r"b\d+", tag):
+            with urllib.request.urlopen(urllib.request.Request(f"{LLAMA_RELEASES}/download/{tag}/nightly-tag.txt",
+                                                               headers=UA), timeout=30) as r:
+                tag = r.read().decode().strip()
+        return tag if re.fullmatch(r"b\d+", tag) else None
+    except Exception:
+        return None
+
+
+def fetch_llama(build, backend):
+    """Download this build's archives into the storage folder. The names follow a fixed pattern, so no API call is
+    needed. Returns the archive paths, or None if the build has no such file (404)."""
+    got = []
+    for name in choose_asset(build, backend):
+        url = f"{LLAMA_RELEASES}/download/{build}/{name}"
+        dest = os.path.join(home(), name)
+        say(f"Downloading {name} …")
+        try:
+            urllib.request.urlretrieve(url, dest)
+        except urllib.error.HTTPError as e:
+            for p in got:
+                os.remove(p)
+            if e.code == 404:
+                return None
+            raise SystemExit(f"✗ Couldn't download {url}: {e}")
+        except OSError as e:
+            raise SystemExit(f"✗ Couldn't download {url}: {e}. Check the internet connection and run install again.")
+        got.append(dest)
+    return got
+
+
+def choose_asset(build, backend):
     system, arch = platform.system(), platform.machine().lower()
     arm = arch in ("arm64", "aarch64")
-    b = LLAMA_BUILD
+    b = build
     if system == "Darwin":
         return [f"llama-{b}-bin-macos-{'arm64' if arm else 'x64'}.tar.gz"]
     if system == "Linux":
@@ -288,19 +328,31 @@ def cmd_install():
     if platform.system() == "Darwin":
         backend = "metal" if platform.machine() == "arm64" else "cpu"   # macOS builds pick Metal themselves
     root = os.path.join(home(), "llama")
+    st = load_state()
     if find_server(root) and not ARGS.force:
-        say(f"✓ llama.cpp already installed: {find_server(root)}"); return
-    rel = fetch_json(f"https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/{LLAMA_BUILD}")
-    urls = {a["name"]: a["browser_download_url"] for a in rel["assets"]}
-    wanted = choose_asset(urls, backend)
-    os.makedirs(root, exist_ok=True)
-    for name in wanted:
-        if name not in urls:
-            raise SystemExit(f"Release {LLAMA_BUILD} has no {name}. Available: {', '.join(sorted(urls))}")
-        dest = os.path.join(home(), name)
-        say(f"Downloading {name} …")
-        urllib.request.urlretrieve(urls[name], dest)
-        if name.endswith(".zip"):
+        say(f"✓ llama.cpp {st.get('build') or ''} already installed: {find_server(root)}  (to update: install --force)"); return
+    if find_server(root) and pid_alive(st.get("pid")):
+        raise SystemExit("The model is running from the installed llama.cpp. Run stop first, then install --force.")
+    if ARGS.build == "latest":
+        latest = latest_build()
+        if not latest:
+            say(f"Couldn't look up the latest llama.cpp release, so using {TESTED_BUILD}, the build tested with this skill.")
+        builds = [b for b in (latest, TESTED_BUILD) if b]
+    else:
+        builds = [TESTED_BUILD if ARGS.build == "tested" else ARGS.build]
+    for build in builds:
+        archives = fetch_llama(build, backend)
+        if archives:
+            break
+        if build != builds[-1]:
+            say(f"llama.cpp {build} has no download for this computer; using {TESTED_BUILD}, the build tested with this skill.")
+    else:
+        raise SystemExit(f"✗ llama.cpp {builds[-1]} has no {' + '.join(choose_asset(builds[-1], backend))}. "
+                         f"See {LLAMA_RELEASES} or try --backend cpu.")
+    shutil.rmtree(root, ignore_errors=True)   # an update must not leave the old llama-server next to the new one
+    os.makedirs(root)
+    for dest in archives:
+        if dest.endswith(".zip"):
             zipfile.ZipFile(dest).extractall(root)
         else:
             with tarfile.open(dest) as t:
@@ -318,8 +370,8 @@ def cmd_install():
         subprocess.run(["xattr", "-dr", "com.apple.quarantine", root], stderr=subprocess.DEVNULL)  # macOS blocks downloaded binaries otherwise
     out = subprocess.run([server, "--version"], capture_output=True, text=True)
     say((out.stdout + out.stderr).strip().splitlines()[0] if (out.stdout + out.stderr).strip() else "(no version output)")
-    save_state(server=server, backend=backend)
-    say(f"✓ llama.cpp {LLAMA_BUILD} ({backend}) installed.")
+    save_state(server=server, backend=backend, build=build)
+    say(f"✓ llama.cpp {build} ({backend}) installed" + (" (the build tested with this skill)." if build == TESTED_BUILD else "."))
 
 
 # ---------------------------------------------------------------- install the Python environment (original format)
@@ -391,10 +443,10 @@ def downloaded_sizes():
     return out
 
 
-def run_hint():
+def run_hint(py=None):
     """The exact command the user should type later, including --dir if it isn't the default."""
     script = os.path.abspath(__file__)
-    py = "py" if platform.system() == "Windows" else "python3"
+    py = py or ("py" if platform.system() == "Windows" else "python3")
     d = home()
     extra = "" if d == os.path.expanduser("~/k2-horizon-local") else f' --dir "{d}"'
     port = "" if ARGS.port == PORT else f" --port {ARGS.port}"
@@ -606,7 +658,8 @@ def cmd_serve():
     if port_in_use():
         if pid_alive(st.get("pid")) and healthy():
             if st.get("serving") == key:
-                say(f"✓ {label(key)} is already running at http://127.0.0.1:{ARGS.port}"); return
+                say(f"✓ {label(key)} is already running at http://127.0.0.1:{ARGS.port}")
+                return say_how_to_use(key)
             raise SystemExit(f"{label(st.get('serving') or '?')} is running. Run stop first, then serve again.")
         raise SystemExit(f"✗ Port {ARGS.port} is used by another program. Stop it, or pick another port: --port 8081 (use it with ask too).")
     log = open(os.path.join(home(), "server.log"), "w")
@@ -633,11 +686,17 @@ def cmd_serve():
             raise SystemExit("✗ The server stopped while loading. Last log lines:\n" + tail)
         if healthy():
             say(f"✓ {label(key)} ready in {time.time() - t0:.0f}s at http://127.0.0.1:{ARGS.port}  (OpenAI-compatible API at /v1)")
-            h = run_hint()
-            say(f"  Ask:  {h} ask \"your question\"\n  Stop: {h} stop")
-            return
+            return say_how_to_use(key)
         time.sleep(1)
     raise SystemExit("✗ Still not ready after 15 minutes. Check server.log; the computer may be out of memory.")
+
+
+def say_how_to_use(key):
+    """The ways to talk to the running model. llama-server has a chat page at its address; original_server.py doesn't."""
+    h = run_hint()
+    if key_format(key) != "original":
+        say(f"  Web chat: http://127.0.0.1:{ARGS.port}  (open it in a browser)")
+    say(f"  Chat: {h} chat\n  Ask:  {h} ask \"your question\"\n  Stop: {h} stop")
 
 
 def cmd_stop():
@@ -663,7 +722,7 @@ def cmd_stop():
 
 def cmd_status():
     st = load_state()
-    say(json.dumps({k: st.get(k) for k in ("server", "backend", "models", "active", "serving", "pid", "port")}, indent=1))
+    say(json.dumps({k: st.get(k) for k in ("server", "build", "backend", "models", "active", "serving", "pid", "port")}, indent=1))
     say(f"running ✓ ({st.get('serving')})" if healthy() else "not running")
 
 
@@ -730,7 +789,112 @@ def cmd_ask():
     say(f"\n{size or 'model'} · {time.time() - t0:.1f}s · {res.get('usage', {}).get('completion_tokens', '?')} tokens" + (f" · {tps:.0f} tokens/s" if tps else ""))
 
 
+# ---------------------------------------------------------------- chat
+def cmd_chat():
+    if not healthy():
+        raise SystemExit("The model isn't running. Run: serve")
+    if ARGS.window:
+        return open_chat_window()
+    try:
+        import readline   # arrow keys and history while typing; not available on Windows
+    except ImportError:
+        pass
+    key = load_state().get("serving")
+    temp = MODELS.get(key_size(key) if key else "", {}).get("temp", 1.0)
+    effort = ARGS.effort
+    say(f"K2 Horizon {label(key) if key else ''} · {effort} thinking · runs privately on this computer")
+    say("Type a message and press Enter. /new starts over, /effort low|medium|high changes the thinking, /exit quits.\n")
+    history = []
+    while True:
+        try:
+            text = input("you › ").strip()
+        except (EOFError, KeyboardInterrupt):
+            say(); break
+        if not text:
+            continue
+        if text in ("/exit", "/quit", "exit", "quit"):
+            break
+        if text == "/new":
+            history = []; say("(started over)\n"); continue
+        if text.startswith("/effort"):
+            v = text.split()[1:]
+            if v and v[0] in ("low", "medium", "high"):
+                effort = v[0]; say(f"(thinking: {effort})\n")
+            else:
+                say("Use /effort low, /effort medium or /effort high\n")
+            continue
+        history.append({"role": "user", "content": text})
+        try:
+            history.append({"role": "assistant", "content": stream_reply(history, temp, effort)})
+        except KeyboardInterrupt:
+            history.pop(); say("\n(stopped)\n")
+
+
+def stream_reply(messages, temp, effort):
+    """Print the answer as it arrives and return it. While the model thinks, show a 'thinking…' placeholder."""
+    body = {"messages": messages, "temperature": temp, "top_p": 0.95, "max_tokens": ARGS.max_tokens, "stream": True,
+            "chat_template_kwargs": {"reasoning_effort": effort}}
+    req = urllib.request.Request(f"http://127.0.0.1:{ARGS.port}/v1/chat/completions", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    reasoning, content, thinking, started, tps = "", "", False, False, None
+    out = sys.stdout
+    with urllib.request.urlopen(req, timeout=900) as r:
+        for line in r:
+            line = line.decode("utf-8", "replace").strip()
+            if not line.startswith("data:") or line == "data: [DONE]":
+                continue
+            chunk = json.loads(line[5:])
+            tps = (chunk.get("timings") or {}).get("predicted_per_second") or tps
+            delta = (chunk.get("choices") or [{}])[0].get("delta") or {}
+            if delta.get("reasoning_content"):
+                reasoning += delta["reasoning_content"]
+                if not thinking and not started:
+                    out.write("k2 › thinking…"); out.flush(); thinking = True
+            if delta.get("content"):
+                if not started:
+                    out.write(("\r" + " " * 20 + "\r" if thinking else "") + "k2 › "); started = True
+                content += delta["content"]; out.write(delta["content"]); out.flush()
+    _, answer, _ = read_message({"reasoning_content": reasoning, "content": content})
+    if not started:   # 3.7B at medium effort: the whole reply arrives as reasoning (see read_message)
+        out.write(("\r" + " " * 20 + "\r" if thinking else "") + "k2 › " + (answer or "(empty)"))
+    say(f"\n   ({tps:.0f} tokens/s)\n" if tps else "\n")
+    return answer
+
+
+def open_chat_window():
+    """Start the chat in a new terminal window, so an assistant that runs commands in the background can hand the
+    user a chat they can type into."""
+    py = f'"{sys.executable}"'   # the Python running now, in case python3 isn't on the new window's PATH
+    cmd = f"{run_hint(py)} chat --effort {ARGS.effort}"
+    system, ok = platform.system(), False
+    if system == "Darwin":
+        path = os.path.join(home(), "chat.command")   # Terminal opens .command files; no extra permission needed
+        with open(path, "w") as f:
+            f.write(f"#!/bin/sh\nclear\n{cmd}\n")
+        os.chmod(path, 0o755)
+        ok = subprocess.run(["open", path]).returncode == 0
+    elif system == "Windows":
+        path = os.path.join(home(), "chat.bat")
+        with open(path, "w") as f:
+            f.write(f"@echo off\r\ntitle K2 Horizon\r\n{cmd}\r\n")
+        os.startfile(path); ok = True
+    else:
+        for term in (["x-terminal-emulator", "-e"], ["gnome-terminal", "--"], ["konsole", "-e"], ["xterm", "-e"]):
+            if shutil.which(term[0]):
+                subprocess.Popen(term + ["sh", "-c", cmd], start_new_session=True,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                ok = True; break
+    say("✓ Opened the chat in a new terminal window." if ok else "✗ Couldn't open a terminal window on this computer.")
+    say(f"  To start it yourself, run in a terminal: {run_hint()} chat")
+
+
 # ---------------------------------------------------------------- main
+def build_arg(s):
+    if re.fullmatch(r"latest|tested|b\d+", s):
+        return s
+    raise argparse.ArgumentTypeError(f"use latest, tested or a build like {TESTED_BUILD}")
+
+
 def main():
     global ARGS
     common = argparse.ArgumentParser(add_help=False)   # so --dir/--port work before or after the command
@@ -743,6 +907,7 @@ def main():
     sp("check")
     fmts = list(FORMATS)
     p = sp("install"); p.add_argument("--backend", default="auto", choices=["auto", "cpu", "cuda", "vulkan"]); p.add_argument("--force", action="store_true")
+    p.add_argument("--build", default="latest", type=build_arg, help=f"llama.cpp build: latest (default), tested ({TESTED_BUILD}), or a specific one like {TESTED_BUILD}")
     p.add_argument("--format", default="gguf", choices=fmts, help="original: set up PyTorch + Transformers instead of llama.cpp")
     p = sp("download"); p.add_argument("--size", choices=list(MODELS)); p.add_argument("--format", default="gguf", choices=fmts)
     p.add_argument("--quant", choices=["Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "BF16"], help="GGUF file to use (BF16 = --format gguf-bf16)")
@@ -751,12 +916,14 @@ def main():
     p = sp("ask"); p.add_argument("prompt"); p.add_argument("--effort", default="medium", choices=["low", "medium", "high"],
                    help="the model's own default is high; ask uses medium so quick checks are fast")
     p.add_argument("--max-tokens", type=int, default=4096); p.add_argument("--show-thinking", action="store_true")
+    p = sp("chat"); p.add_argument("--effort", default="medium", choices=["low", "medium", "high"])
+    p.add_argument("--max-tokens", type=int, default=8192); p.add_argument("--window", action="store_true", help="open the chat in a new terminal window")
     sp("status"); sp("stop")
     ARGS = ap.parse_args()
     ARGS.dir = getattr(ARGS, "dir", None)
     ARGS.port = getattr(ARGS, "port", PORT)
     {"check": cmd_check, "install": cmd_install, "download": cmd_download, "serve": cmd_serve,
-     "ask": cmd_ask, "status": cmd_status, "stop": cmd_stop}[ARGS.cmd]()
+     "ask": cmd_ask, "chat": cmd_chat, "status": cmd_status, "stop": cmd_stop}[ARGS.cmd]()
 
 
 if __name__ == "__main__":
